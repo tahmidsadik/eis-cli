@@ -4,7 +4,7 @@ definitions:
   caches:
     gomodules: $GOPATH/pkg/mod
     golangci: ~/.cache/golangci-lint
-  
+
   steps:
     - step: &build-step
         name: Build
@@ -13,10 +13,10 @@ definitions:
         script:
           # Build binary
           - go build -o eiscli .
-          
+
           # Verify binary
           - ./eiscli --version
-    
+
     - step: &lint-step
         name: Lint and Format Check
         caches:
@@ -26,7 +26,7 @@ definitions:
           # Install golangci-lint (use specific version compatible with .golangci.yml)
           - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
           - export PATH=$PATH:$(go env GOPATH)/bin
-          
+
           # Run gofmt check
           - |
             if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
@@ -34,13 +34,13 @@ definitions:
               gofmt -s -d .
               exit 1
             fi
-          
+
           # Run go vet
           - go vet ./...
-          
+
           # Run golangci-lint with explicit config file
           - golangci-lint run --config .golangci.yml --timeout=5m
-    
+
     - step: &test-step
         name: Run Tests
         caches:
@@ -48,20 +48,20 @@ definitions:
         script:
           # Run tests with race detector and coverage
           - go test -v -race -coverprofile=coverage.out ./...
-          
+
           # Upload coverage to Codecov
           - |
             if [ -f coverage.out ]; then
               bash <(curl -s https://codecov.io/bash) -f coverage.out || echo "Codecov upload failed (non-blocking)"
             fi
-    
+
     - step: &security-step
         name: Security Scan
         image: zricethezav/gitleaks:latest
         script:
           # Run Gitleaks scan (will fail if leaks are detected)
           - gitleaks detect --source . --verbose --no-banner
-    
+
     - step: &build-release-step
         name: Build Release with OAuth
         caches:
@@ -70,19 +70,19 @@ definitions:
           # OAuth credentials are injected from repository variables
           - export BITBUCKET_OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
           - export BITBUCKET_OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
-          
+
           # Build release binary with OAuth credentials baked in
           - make build-release
-          
+
           # Verify OAuth credentials were injected
           - make verify-oauth-build
-          
+
           # Show binary info
           - ls -lh ./eiscli
           - file ./eiscli
         artifacts:
           - eiscli
-    
+
     - step: &build-multi-platform-step
         name: Build Multi-Platform Release Binaries
         caches:
@@ -91,50 +91,50 @@ definitions:
           # Get version from git tag or commit
           - export VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
           - echo "Building version:$VERSION"
-          
+
           # OAuth credentials are injected from repository variables
           - export BITBUCKET_OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
           - export BITBUCKET_OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
-          
+
           # Build for all platforms
           - make build-linux-amd64
           - make build-darwin-amd64
           - make build-darwin-arm64
-          
+
           # List built binaries
           - ls -lh eiscli-*
         artifacts:
           - eiscli-*-linux-amd64
           - eiscli-*-darwin-amd64
           - eiscli-*-darwin-arm64
-    
+
     - step: &upload-downloads-step
         name: Upload to Bitbucket Downloads
         script:
           - export VERSION=${BITBUCKET_TAG}
           - echo "Uploading version $VERSION to Downloads..."
-          
+
           # Upload Linux binary
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-${VERSION}-linux-amd64"
-          
+
           # Upload macOS Intel binary
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-${VERSION}-darwin-amd64"
-          
+
           # Upload macOS Apple Silicon binary
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-${VERSION}-darwin-arm64"
-          
+
           - echo "✓ All platform binaries uploaded to Downloads section"
 
 pipelines:
@@ -142,7 +142,7 @@ pipelines:
     - step: *build-step
     - step: *lint-step
     - step: *test-step
-  
+
   branches:
     main:
       - step: *build-step
@@ -154,15 +154,15 @@ pipelines:
       - step: *lint-step
       - step: *test-step
       - step: *build-multi-platform-step
-  
+
   pull-requests:
-    '**':
+    "**":
       - step: *build-step
       - step: *lint-step
       - step: *test-step
-  
+
   tags:
-    'v*':
+    "v*":
       - step: *build-step
       - step: *lint-step
       - step: *test-step
