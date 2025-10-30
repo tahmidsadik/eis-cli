@@ -82,6 +82,60 @@ definitions:
           - file ./eiscli
         artifacts:
           - eiscli
+    
+    - step: &build-multi-platform-step
+        name: Build Multi-Platform Release Binaries
+        caches:
+          - gomodules
+        script:
+          # Get version from git tag or commit
+          - export VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          - echo "Building version:$VERSION"
+          
+          # OAuth credentials are injected from repository variables
+          - export BITBUCKET_OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
+          - export BITBUCKET_OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
+          
+          # Build for all platforms
+          - make build-linux-amd64
+          - make build-darwin-amd64
+          - make build-darwin-arm64
+          
+          # List built binaries
+          - ls -lh eiscli-*
+        artifacts:
+          - eiscli-*-linux-amd64
+          - eiscli-*-darwin-amd64
+          - eiscli-*-darwin-arm64
+    
+    - step: &upload-downloads-step
+        name: Upload to Bitbucket Downloads
+        script:
+          - export VERSION=${BITBUCKET_TAG}
+          - echo "Uploading version $VERSION to Downloads..."
+          
+          # Upload Linux binary
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-${VERSION}-linux-amd64"
+          
+          # Upload macOS Intel binary
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-${VERSION}-darwin-amd64"
+          
+          # Upload macOS Apple Silicon binary
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-${VERSION}-darwin-arm64"
+          
+          - echo "✓ All platform binaries uploaded to Downloads section"
 
 pipelines:
   default:
@@ -94,12 +148,12 @@ pipelines:
       - step: *build-step
       - step: *lint-step
       - step: *test-step
-      - step: *build-release-step
+      - step: *build-multi-platform-step
     master:
       - step: *build-step
       - step: *lint-step
       - step: *test-step
-      - step: *build-release-step
+      - step: *build-multi-platform-step
   
   pull-requests:
     '**':
@@ -112,10 +166,5 @@ pipelines:
       - step: *build-step
       - step: *lint-step
       - step: *test-step
-      - step: *build-release-step
-      - step:
-          name: Create Release
-          script:
-            - echo "Creating release for ${BITBUCKET_TAG}"
-            - echo "Binary artifact available for download"
-            # Add your release creation logic here (e.g., upload to S3, create GitHub release, etc.)
+      - step: *build-multi-platform-step
+      - step: *upload-downloads-step
