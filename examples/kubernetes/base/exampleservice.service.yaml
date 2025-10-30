@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: exampleservice
+  name: exampleservice
+spec:
+  ports:
+    - name: rest
+      port: 80
+      protocol: TCP
+      targetPort: 3000
+    - name: grpc
+      port: 81
+      protocol: TCP
+      targetPort: 3001
+  selector:
+    app: exampleservice
+  type: ClusterIP
+

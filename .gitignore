@@ -1,0 +1,102 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.txt
+coverage.xml
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.sum.bak
+
+# Binary output
+eiscli
+eiscli.exe
+dist/
+bin/
+
+# Configuration files (may contain secrets)
+config.yaml
+.eiscli/
+*.env
+*.env.local
+*.env.*.local
+
+# API documentation
+bitbucket-api-swagger.json
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+.atom/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.cache
+
+# Secrets and credentials
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.secret
+*secret*
+*password*
+*credential*
+*.token
+*.access_token
+
+# AWS credentials
+.aws/
+*.aws
+
+# Local development
+.local/
+local/
+
+# Debug files
+*.debug
+debug/
+.vscode-launch.json
+
+# Build artifacts
+*.a
+*.o
+*.out
+*.dwarf
+*.elf

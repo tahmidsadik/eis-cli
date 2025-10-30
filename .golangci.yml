@@ -1,0 +1,86 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - gocritic
+    - unconvert
+    - unparam
+    - gosec
+  disable:
+    - dupl
+    - gocyclo
+    - lll
+    - funlen
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false  # Allow blank identifier for intentionally discarded errors
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - opinionated
+      - performance
+    disabled-checks:
+      - unnamedResult  # Allow unnamed return values
+      - nestingReduce  # Allow nested ifs for readability
+      - paramTypeCombine  # Allow separate types for clarity
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G306  # Allow 0644 permissions for config files
+  misspell:
+    locale: US
+  unparam:
+    check-exported: false  # Don't check exported functions
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - unparam
+    # Allow error discarding with blank identifier (intentional)
+    - text: "Error return value.*is not checked"
+      linters:
+        - errcheck
+      source: "^\\s*_\\s*=.*"
+    # Allow table.Append/Render errors (library functions with unlikely errors)
+    - text: "Error return value of `table\\.(Append|Render)` is not checked"
+      linters:
+        - errcheck
+    # Allow unused parameters (function signatures that may change)
+    - linters:
+        - unparam
+      text: ".*is unused"
+    # Allow ineffectual assignments in initialization code
+    - path: internal/bitbucket/environment_helper\.go
+      linters:
+        - ineffassign
+      text: "ineffectual assignment to shouldCreate"
+    # Allow unused method parameter (may be used in future)
+    - path: internal/bitbucket/rest_client\.go
+      linters:
+        - unparam
+      text: ".*method.*always receives"
+  exclude-files:
+    - ".*\\.pb\\.go$"
+  exclude-dirs:
+    - vendor
+  max-issues-per-linter: 0
+  max-same-issues: 0
+

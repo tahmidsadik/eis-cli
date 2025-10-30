@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: exampleservice
+  name: exampleservice
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: exampleservice
+  template:
+    metadata:
+      labels:
+        app: exampleservice
+    spec:
+      topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app: exampleservice
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+      serviceAccountName: eks-backendservices
+      containers:
+        - image: exampleservice
+          name: exampleservice
+          envFrom:
+            - configMapRef:
+                name: global
+            - configMapRef:
+                name: exampleservice
+          readinessProbe:
+            httpGet:
+              path: /exampleservice/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /exampleservice/health
+              port: 3000
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+            successThreshold: 1
+          # resources:
+          #   requests:
+          #     cpu: "100m"
+          #     memory: "512Mi"
+          #   limits:
+          #     cpu: "1"
+          #     memory: "1Gi"
+
