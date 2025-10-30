@@ -22,6 +22,10 @@ OAUTH_CLIENT_SECRET ?= $(BITBUCKET_OAUTH_CLIENT_SECRET)
 BINARY_NAME = eiscli
 BUILD_DIR = .
 
+# Platform-specific builds
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
+
 # Go build flags
 LDFLAGS = -X 'bitbucket.org/cover42/eiscli/internal/bitbucket.DefaultClientID=$(OAUTH_CLIENT_ID)' \
           -X 'bitbucket.org/cover42/eiscli/internal/bitbucket.DefaultClientSecret=$(OAUTH_CLIENT_SECRET)'
@@ -63,6 +67,47 @@ build-release: ## Build optimized release binary with OAuth credentials
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME) .
 	@echo "✓ Release build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
+
+.PHONY: build-linux-amd64
+build-linux-amd64: ## Build for Linux amd64 with version in filename
+	@echo "Building $(BINARY_NAME) for Linux amd64..."
+	@echo "Version: $(VERSION)"
+	@if [ -z "$(OAUTH_CLIENT_ID)" ] || [ -z "$(OAUTH_CLIENT_SECRET)" ]; then \
+		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
+		exit 1; \
+	fi
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64 .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64
+
+.PHONY: build-darwin-amd64
+build-darwin-amd64: ## Build for macOS amd64 (Intel) with version in filename
+	@echo "Building $(BINARY_NAME) for macOS amd64..."
+	@echo "Version: $(VERSION)"
+	@if [ -z "$(OAUTH_CLIENT_ID)" ] || [ -z "$(OAUTH_CLIENT_SECRET)" ]; then \
+		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
+		exit 1; \
+	fi
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64 .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64
+
+.PHONY: build-darwin-arm64
+build-darwin-arm64: ## Build for macOS arm64 (Apple Silicon) with version in filename
+	@echo "Building $(BINARY_NAME) for macOS arm64..."
+	@echo "Version: $(VERSION)"
+	@if [ -z "$(OAUTH_CLIENT_ID)" ] || [ -z "$(OAUTH_CLIENT_SECRET)" ]; then \
+		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
+		exit 1; \
+	fi
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64 .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64
+
+.PHONY: build-all-platforms
+build-all-platforms: build-linux-amd64 build-darwin-amd64 build-darwin-arm64 ## Build for all supported platforms
+	@echo "✓ All platform builds complete"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*
 
 .PHONY: install
 install: build ## Install the CLI to GOPATH/bin
