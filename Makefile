@@ -84,9 +84,9 @@ build-linux-amd64: ## Build for Linux amd64 with version in filename
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64 .
-	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64"
-	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-$(VERSION) .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-$(VERSION)"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-$(VERSION)
 
 .PHONY: build-darwin-amd64
 build-darwin-amd64: ## Build for macOS amd64 (Intel) with version in filename
@@ -96,9 +96,9 @@ build-darwin-amd64: ## Build for macOS amd64 (Intel) with version in filename
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64 .
-	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64"
-	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-$(VERSION) .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-$(VERSION)"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-$(VERSION)
 
 .PHONY: build-darwin-arm64
 build-darwin-arm64: ## Build for macOS arm64 (Apple Silicon) with version in filename
@@ -108,14 +108,32 @@ build-darwin-arm64: ## Build for macOS arm64 (Apple Silicon) with version in fil
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64 .
-	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64"
-	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-$(VERSION) .
+	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-$(VERSION)"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-$(VERSION)
 
 .PHONY: build-all-platforms
 build-all-platforms: build-linux-amd64 build-darwin-amd64 build-darwin-arm64 ## Build for all supported platforms
 	@echo "✓ All platform builds complete"
-	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-*-$(VERSION)
+
+.PHONY: create-latest-binaries
+create-latest-binaries: ## Create latest binaries by copying versioned binaries
+	@echo "Creating latest binaries from versioned builds..."
+	@if [ -f "$(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-$(VERSION)" ]; then \
+		cp "$(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-$(VERSION)" "$(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-latest"; \
+		echo "✓ Created $(BINARY_NAME)-linux-amd64-latest"; \
+	fi
+	@if [ -f "$(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-$(VERSION)" ]; then \
+		cp "$(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-$(VERSION)" "$(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64-latest"; \
+		echo "✓ Created $(BINARY_NAME)-darwin-amd64-latest"; \
+	fi
+	@if [ -f "$(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-$(VERSION)" ]; then \
+		cp "$(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-$(VERSION)" "$(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64-latest"; \
+		echo "✓ Created $(BINARY_NAME)-darwin-arm64-latest"; \
+	fi
+	@echo "✓ Latest binaries created"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-*-latest 2>/dev/null || true
 
 .PHONY: build-all-platforms-compressed
 build-all-platforms-compressed: ## Build for all platforms and compress with UPX (requires UPX installed)
@@ -128,14 +146,14 @@ build-all-platforms-compressed: ## Build for all platforms and compress with UPX
 	fi
 	@$(MAKE) build-all-platforms
 	@echo "Compressing binaries with UPX..."
-	@for binary in $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*; do \
+	@for binary in $(BUILD_DIR)/$(BINARY_NAME)-*-$(VERSION); do \
 		if [ -f "$$binary" ]; then \
 			echo "Compressing $$binary..."; \
 			upx --best --lzma "$$binary" || echo "Warning: UPX compression failed for $$binary"; \
 		fi \
 	done
 	@echo "✓ All platform builds complete (compressed)"
-	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-*-$(VERSION)
 
 .PHONY: compress-binary
 compress-binary: ## Compress existing binary with UPX (requires UPX installed)
