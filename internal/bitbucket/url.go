@@ -17,9 +17,19 @@ func BuildPullRequestsURL(workspace, repoSlug string) string {
 	return fmt.Sprintf("https://bitbucket.org/%s/%s/pull-requests", workspace, repoSlug)
 }
 
+// BuildPullRequestURL constructs the Bitbucket pull request URL for a specific PR
+func BuildPullRequestURL(workspace, repoSlug string, prID int) string {
+	return fmt.Sprintf("https://bitbucket.org/%s/%s/pull-requests/%d", workspace, repoSlug, prID)
+}
+
 // BuildDeploymentVariablesURL constructs the Bitbucket deployment variables settings page URL
 func BuildDeploymentVariablesURL(workspace, repoSlug string) string {
-	return fmt.Sprintf("https://bitbucket.org/%s/%s/admin/addon/admin/pipelines/deployment-settings", workspace, repoSlug)
+	return fmt.Sprintf("https://bitbucket.org/%s/%s/admin/pipelines/deployment-settings", workspace, repoSlug)
+}
+
+// BuildRepositoryVariablesURL constructs the Bitbucket repository variables settings page URL
+func BuildRepositoryVariablesURL(workspace, repoSlug string) string {
+	return fmt.Sprintf("https://bitbucket.org/%s/%s/admin/pipelines/repository-variables", workspace, repoSlug)
 }
 
 // BuildSettingsURL constructs the Bitbucket repository settings page URL

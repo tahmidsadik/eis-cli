@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"bitbucket.org/cover42/eiscli/internal/config"
+	"bitbucket.org/cover42/eiscli/internal/git"
 	"github.com/ktrysmt/go-bitbucket"
 )
 
@@ -170,7 +171,7 @@ func (c *Client) ListPipelinesWithSteps(opts *PipelinesOptions, logLines int) ([
 	}
 
 	if logLines == 0 {
-		logLines = 10 // Default log lines
+		logLines = 25 // Default log lines
 	}
 
 	// Use the REST client for better reliability
@@ -339,6 +340,109 @@ type Environment struct {
 	UUID string
 	Name string
 	Type string
+}
+
+// PullRequest represents a Bitbucket pull request
+type PullRequest struct {
+	ID                int
+	Title             string
+	Description       string
+	State             string // OPEN, MERGED, DECLINED, SUPERSEDED
+	SourceBranch      string
+	DestinationBranch string
+	Author            string
+	Reviewers         []string // List of reviewer UUIDs/usernames
+	CreatedOn         time.Time
+	UpdatedOn         time.Time
+	WebURL            string
+}
+
+// PullRequestOptions holds options for listing pull requests
+type PullRequestOptions struct {
+	State       string // OPEN, MERGED, DECLINED, SUPERSEDED, or empty for all
+	Limit       int    // Number of results to return
+	Author      string // Filter by PR author (supports "@me" for current user)
+	AuthorEmail string // Filter by PR author email (used when Author is "@me")
+}
+
+// CreatePullRequest creates a new pull request
+func (c *Client) CreatePullRequest(repoSlug, sourceBranch, destBranch, title, description string) (*PullRequest, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+	if sourceBranch == "" {
+		return nil, fmt.Errorf("source branch is required")
+	}
+	if destBranch == "" {
+		return nil, fmt.Errorf("destination branch is required")
+	}
+	if title == "" {
+		return nil, fmt.Errorf("title is required")
+	}
+
+	return c.restClient.CreatePullRequest(repoSlug, sourceBranch, destBranch, title, description)
+}
+
+// ListPullRequests retrieves pull requests for a repository
+func (c *Client) ListPullRequests(repoSlug string, opts *PullRequestOptions) ([]*PullRequest, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+
+	state := "OPEN" // Default to open PRs
+	limit := 25     // Default limit
+	author := ""
+	authorEmail := ""
+
+	if opts != nil {
+		if opts.State != "" {
+			state = opts.State
+		}
+		if opts.Limit > 0 {
+			limit = opts.Limit
+		}
+		if opts.Author != "" {
+			author = opts.Author
+			// Resolve "@me" to current user's UUID/username and git email
+			if author == "@me" {
+				userInfo, err := c.restClient.GetCurrentUser()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get current user: %w", err)
+				}
+				// Prefer UUID for matching, fallback to username
+				switch {
+				case userInfo.UUID != "":
+					author = userInfo.UUID
+				case userInfo.Username != "":
+					author = userInfo.Username
+				default:
+					return nil, fmt.Errorf("failed to resolve current user identifier")
+				}
+
+				// Get git user email for additional filtering
+				gitEmail, err := git.GetUserEmail()
+				if err == nil {
+					authorEmail = gitEmail
+				}
+				// Note: If git email can't be retrieved, we'll still filter by UUID/username
+			}
+		}
+		// Use provided AuthorEmail if set (though typically it's only set when Author is "@me")
+		if opts.AuthorEmail != "" {
+			authorEmail = opts.AuthorEmail
+		}
+	}
+
+	return c.restClient.ListPullRequests(repoSlug, state, limit, author, authorEmail)
+}
+
+// GetDefaultBranch retrieves the default branch for a repository
+func (c *Client) GetDefaultBranch(repoSlug string) (string, error) {
+	if repoSlug == "" {
+		return "", fmt.Errorf("repository slug is required")
+	}
+
+	return c.restClient.GetRepositoryDefaultBranch(repoSlug)
 }
 
 // ListRepositories retrieves all repositories in the workspace
