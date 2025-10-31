@@ -87,10 +87,18 @@ func Load() (*Config, error) {
 
 	// Try to read config file (optional)
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found - create a default one
+			if err := createDefaultConfigFile(); err != nil {
+				// If creation fails, that's OK - we'll use env vars and build-time defaults
+				// Just log it but don't fail
+			} else {
+				// Try reading again after creating default config
+				_ = viper.ReadInConfig()
+			}
+		} else {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
-		// Config file not found is OK, we'll use env vars
 	}
 
 	var config Config
@@ -140,6 +148,58 @@ var (
 func RegisterBuildTimeOAuthDefaults(clientIDFunc, clientSecretFunc func() string) {
 	getBuildTimeClientID = clientIDFunc
 	getBuildTimeClientSecret = clientSecretFunc
+}
+
+// createDefaultConfigFile creates a default config file if none exists
+func createDefaultConfigFile() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	configDir := filepath.Join(home, ".eiscli")
+	configFile := filepath.Join(configDir, "config.yaml")
+
+	// Create .eiscli directory if it doesn't exist
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Check if config file already exists
+	if _, err := os.Stat(configFile); err == nil {
+		// File already exists, don't overwrite
+		return nil
+	}
+
+	// Create default config content
+	defaultConfig := `# EIS CLI Configuration
+# This file was automatically created with default settings.
+# You can modify these values as needed.
+
+bitbucket:
+  # Your Bitbucket workspace (organization slug)
+  workspace: "cover42"
+
+# AWS Configuration (optional)
+# Uncomment and modify if you need custom AWS profiles
+#aws:
+#  default_profile: "default"     # For production/testing environments
+#  nonprod_profile: "staging"     # For staging/dev environments
+#  region: "eu-central-1"
+
+# Deployment Configuration (optional)
+# Uncomment and modify if you want to change default behavior
+#deployment:
+#  auto_create_environments: false
+#  default_environment_type: "Test"
+`
+
+	// Write config file
+	if err := os.WriteFile(configFile, []byte(defaultConfig), 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
 }
 
 // Get returns the global configuration
