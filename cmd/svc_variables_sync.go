@@ -74,7 +74,7 @@ in the current directory (based on the git remote URL).`,
 				fmt.Printf("  %v\n", err)
 				fmt.Println("\nUsage:")
 				fmt.Println("  1. Run this command from within a git repository, or")
-				fmt.Println("  2. Provide a service name: eiscli svc variables sync <service-name> --env <environment>")
+				fmt.Println("  2. Provide a service name: eiscli vars sync <service-name> --env <environment>")
 				return
 			}
 			serviceName = detectedSlug
@@ -84,7 +84,7 @@ in the current directory (based on the git remote URL).`,
 		// Validate environment parameter
 		if syncEnvironment == "" {
 			fmt.Println("Error: --env flag is required")
-			fmt.Println("\nUsage: eiscli svc variables sync [service-name] --env <environment>")
+			fmt.Println("\nUsage: eiscli vars sync [service-name] --env <environment>")
 			fmt.Println("\nAvailable environments: testing, staging, prod, prod-zurich, dev")
 			return
 		}
@@ -404,7 +404,7 @@ func applyVariableSync(client *bitbucket.Client, serviceName, envUUID string, va
 }
 
 func init() {
-	svcVariablesCmd.AddCommand(svcVariablesSyncCmd)
+	varsCmd.AddCommand(svcVariablesSyncCmd)
 	svcVariablesSyncCmd.Flags().StringVarP(&syncEnvironment, "env", "e", "", "Environment to sync (required: testing, staging, prod, prod-zurich, dev)")
 	svcVariablesSyncCmd.Flags().StringVarP(&kubernetesPath, "kubernetes-path", "k", "./kubernetes", "Path to kubernetes folder")
 	svcVariablesSyncCmd.Flags().BoolVarP(&applySyncChanges, "apply", "a", false, "Actually apply the changes (without this, just shows preview)")

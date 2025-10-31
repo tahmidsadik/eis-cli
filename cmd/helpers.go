@@ -20,7 +20,7 @@ func getServiceName(args []string) string {
 		fmt.Printf("  %v\n", err)
 		fmt.Println("\nUsage:")
 		fmt.Println("  1. Run this command from within a git repository, or")
-		fmt.Println("  2. Provide a service name: eiscli svc <command> <service-name>")
+		fmt.Println("  2. Provide a service name: eiscli <command> <service-name>")
 		return ""
 	}
 

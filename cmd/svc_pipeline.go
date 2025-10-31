@@ -17,8 +17,8 @@ var (
 	pipelineLogLines int
 )
 
-var svcPipelineCmd = &cobra.Command{
-	Use:   "pipeline [service-name]",
+var pipelinesCmd = &cobra.Command{
+	Use:   "pipelines [service-name]",
 	Short: "List pipeline build status from Bitbucket",
 	Long: `Display the status of the last pipeline builds for a service.
 Shows build status, duration, commit information, clickable Bitbucket links, and more.
@@ -42,7 +42,7 @@ Use the --logs flag to see detailed pipeline steps and their status.`,
 				fmt.Printf("  %v\n", err)
 				fmt.Println("\nUsage:")
 				fmt.Println("  1. Run this command from within a git repository, or")
-				fmt.Println("  2. Provide a service name: eiscli svc pipeline <service-name>")
+				fmt.Println("  2. Provide a service name: eiscli pipelines <service-name>")
 				return
 			}
 			serviceName = detectedSlug
@@ -220,8 +220,8 @@ func formatDuration(seconds int) string {
 }
 
 func init() {
-	svcCmd.AddCommand(svcPipelineCmd)
-	svcPipelineCmd.Flags().IntVarP(&pipelineLimit, "limit", "l", 5, "Number of pipeline builds to display")
-	svcPipelineCmd.Flags().BoolVarP(&pipelineShowLog, "logs", "s", false, "Show pipeline steps and log snippets")
-	svcPipelineCmd.Flags().IntVar(&pipelineLogLines, "log-lines", 10, "Number of log lines to display per step")
+	rootCmd.AddCommand(pipelinesCmd)
+	pipelinesCmd.Flags().IntVarP(&pipelineLimit, "limit", "l", 5, "Number of pipeline builds to display")
+	pipelinesCmd.Flags().BoolVarP(&pipelineShowLog, "logs", "s", false, "Show pipeline steps and log snippets")
+	pipelinesCmd.Flags().IntVar(&pipelineLogLines, "log-lines", 25, "Number of log lines to display per step")
 }

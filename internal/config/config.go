@@ -161,7 +161,7 @@ func createDefaultConfigFile() error {
 	configFile := filepath.Join(configDir, "config.yaml")
 
 	// Create .eiscli directory if it doesn't exist
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -195,7 +195,7 @@ bitbucket:
 `
 
 	// Write config file
-	if err := os.WriteFile(configFile, []byte(defaultConfig), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(defaultConfig), 0o644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

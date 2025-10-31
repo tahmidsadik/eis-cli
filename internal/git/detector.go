@@ -135,3 +135,65 @@ func IsGitRepository() bool {
 
 	return false
 }
+
+// GetCurrentBranch detects the current git branch name
+func GetCurrentBranch() (string, error) {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Open git repository
+	repo, err := git.PlainOpenWithOptions(cwd, &git.PlainOpenOptions{
+		DetectDotGit: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("not a git repository or git repository not found: %w", err)
+	}
+
+	// Get the HEAD reference
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	// Extract branch name from reference
+	branchName := head.Name().Short()
+	if branchName == "" {
+		return "", fmt.Errorf("failed to extract branch name from HEAD")
+	}
+
+	return branchName, nil
+}
+
+// GetUserEmail retrieves the git user's email from git config
+func GetUserEmail() (string, error) {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Open git repository
+	repo, err := git.PlainOpenWithOptions(cwd, &git.PlainOpenOptions{
+		DetectDotGit: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("not a git repository or git repository not found: %w", err)
+	}
+
+	// Get git config
+	cfg, err := repo.Config()
+	if err != nil {
+		return "", fmt.Errorf("failed to get git config: %w", err)
+	}
+
+	// Get user email from config
+	email := cfg.User.Email
+	if email == "" {
+		return "", fmt.Errorf("git user.email not configured")
+	}
+
+	return email, nil
+}

@@ -57,7 +57,7 @@ in the current directory (based on the git remote URL).`,
 				fmt.Printf("  %v\n", err)
 				fmt.Println("\nUsage:")
 				fmt.Println("  1. Run this command from within a git repository, or")
-				fmt.Println("  2. Provide a service name: eiscli svc variables add <service-name>")
+				fmt.Println("  2. Provide a service name: eiscli vars add <service-name>")
 				return
 			}
 			serviceName = detectedSlug
@@ -93,7 +93,7 @@ in the current directory (based on the git remote URL).`,
 		if addVariableType == "deployment" {
 			if addEnvironmentName == "" {
 				fmt.Println("Error: --env flag is required when using --type deployment")
-				fmt.Println("\nUsage: eiscli svc variables add [service-name] --type deployment --env <environment>")
+				fmt.Println("\nUsage: eiscli vars add [service-name] --type deployment --env <environment>")
 				return
 			}
 
@@ -358,7 +358,7 @@ func createDeploymentVariables(client *bitbucket.Client, serviceName, envUUID st
 }
 
 func init() {
-	svcVariablesCmd.AddCommand(svcVariablesAddCmd)
+	varsCmd.AddCommand(svcVariablesAddCmd)
 	svcVariablesAddCmd.Flags().StringVarP(&addVariableType, "type", "t", "repository", "Type of variables (repository, deployment)")
 	svcVariablesAddCmd.Flags().StringVarP(&addEnvironmentName, "env", "e", "", "Environment name (required for deployment variables)")
 	svcVariablesAddCmd.Flags().BoolVar(&addAutoCreateEnv, "auto-create-env", false, "Automatically create missing environments without prompting")

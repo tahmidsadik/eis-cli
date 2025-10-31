@@ -20,8 +20,8 @@ var (
 	envTypeOverride string
 )
 
-var svcVariablesCmd = &cobra.Command{
-	Use:   "variables [service-name]",
+var varsCmd = &cobra.Command{
+	Use:   "vars [service-name]",
 	Short: "List Bitbucket deployment and repository variables",
 	Long: `Display deployment variables and repository variables configured in Bitbucket.
 These variables are used in pipeline builds and deployments.
@@ -52,7 +52,7 @@ in the current directory (based on the git remote URL).`,
 				fmt.Printf("  %v\n", err)
 				fmt.Println("\nUsage:")
 				fmt.Println("  1. Run this command from within a git repository, or")
-				fmt.Println("  2. Provide a service name: eiscli svc variables <service-name>")
+				fmt.Println("  2. Provide a service name: eiscli vars <service-name>")
 				return
 			}
 			serviceName = detectedSlug
@@ -261,10 +261,10 @@ func displayAllEnvironmentVariables(client *bitbucket.Client, serviceName string
 }
 
 func init() {
-	svcCmd.AddCommand(svcVariablesCmd)
-	svcVariablesCmd.Flags().StringVarP(&variableType, "type", "t", "deployment", "Type of variables to display (deployment, repository)")
-	svcVariablesCmd.Flags().StringVarP(&environmentName, "env", "e", "Test", "Environment name to filter (deployment variables only)")
-	svcVariablesCmd.Flags().BoolVarP(&showAllEnvs, "all", "a", false, "Show variables for all environments (deployment variables only)")
-	svcVariablesCmd.Flags().BoolVar(&autoCreateEnv, "auto-create-env", false, "Automatically create missing environments without prompting")
-	svcVariablesCmd.Flags().StringVar(&envTypeOverride, "env-type", "", "Override environment type (Test, Staging, Production)")
+	rootCmd.AddCommand(varsCmd)
+	varsCmd.Flags().StringVarP(&variableType, "type", "t", "deployment", "Type of variables to display (deployment, repository)")
+	varsCmd.Flags().StringVarP(&environmentName, "env", "e", "Test", "Environment name to filter (deployment variables only)")
+	varsCmd.Flags().BoolVarP(&showAllEnvs, "all", "a", false, "Show variables for all environments (deployment variables only)")
+	varsCmd.Flags().BoolVar(&autoCreateEnv, "auto-create-env", false, "Automatically create missing environments without prompting")
+	varsCmd.Flags().StringVar(&envTypeOverride, "env-type", "", "Override environment type (Test, Staging, Production)")
 }

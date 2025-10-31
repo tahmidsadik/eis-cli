@@ -583,6 +583,240 @@ func (c *RestClient) UpdateWorkspaceVariable(uuid, key, value string, secured bo
 	return data, nil
 }
 
+// CreatePullRequest creates a new pull request
+func (c *RestClient) CreatePullRequest(repoSlug, sourceBranch, destBranch, title, description string) (*PullRequest, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/pullrequests", c.workspace, repoSlug)
+
+	requestBody := map[string]interface{}{
+		"title":       title,
+		"description": description,
+		"source": map[string]interface{}{
+			"branch": map[string]interface{}{
+				"name": sourceBranch,
+			},
+		},
+		"destination": map[string]interface{}{
+			"branch": map[string]interface{}{
+				"name": destBranch,
+			},
+		},
+	}
+
+	data, err := c.doRequestWithBody("POST", path, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pull request: %w", err)
+	}
+
+	return parsePullRequest(data, c.workspace, repoSlug)
+}
+
+// ListPullRequests fetches pull requests for a repository
+func (c *RestClient) ListPullRequests(repoSlug string, state string, limit int, author string, authorEmail string) ([]*PullRequest, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/pullrequests?pagelen=%d", c.workspace, repoSlug, limit)
+	if state != "" {
+		path += fmt.Sprintf("&state=%s", state)
+	}
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		return nil, err
+	}
+
+	pullRequests := make([]*PullRequest, 0)
+
+	if values, ok := data["values"].([]interface{}); ok {
+		for _, v := range values {
+			if prData, ok := v.(map[string]interface{}); ok {
+				// Filter by author if specified (check raw data before parsing)
+				if author != "" || authorEmail != "" {
+					found := false
+					if authorData, ok := prData["author"].(map[string]interface{}); ok {
+						// Check UUID or username if author is provided
+						if author != "" {
+							if uuid, ok := authorData["uuid"].(string); ok && uuid == author {
+								found = true
+							} else if username, ok := authorData["username"].(string); ok && username == author {
+								found = true
+							}
+						}
+						// Check email if provided (matches if UUID/username OR email matches)
+						if !found && authorEmail != "" {
+							if email, ok := authorData["email"].(string); ok && email == authorEmail {
+								found = true
+							}
+						}
+					}
+					if !found {
+						continue
+					}
+				}
+
+				pr, err := parsePullRequest(prData, c.workspace, repoSlug)
+				if err != nil {
+					fmt.Printf("Warning: failed to parse pull request: %v\n", err)
+					continue
+				}
+
+				pullRequests = append(pullRequests, pr)
+			}
+		}
+	}
+
+	return pullRequests, nil
+}
+
+// GetRepositoryDefaultBranch fetches the default branch for a repository
+func (c *RestClient) GetRepositoryDefaultBranch(repoSlug string) (string, error) {
+	path := fmt.Sprintf("/repositories/%s/%s", c.workspace, repoSlug)
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		return "", fmt.Errorf("failed to get repository: %w", err)
+	}
+
+	// Extract mainbranch.name from response
+	if mainbranch, ok := data["mainbranch"].(map[string]interface{}); ok {
+		if name, ok := mainbranch["name"].(string); ok {
+			return name, nil
+		}
+	}
+
+	// Fallback to common defaults if mainbranch is not available
+	return "main", nil
+}
+
+// UserInfo represents the current authenticated user
+type UserInfo struct {
+	UUID     string
+	Username string
+}
+
+// GetCurrentUser fetches the current authenticated user information
+func (c *RestClient) GetCurrentUser() (*UserInfo, error) {
+	path := "/user"
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	user := &UserInfo{}
+
+	// Extract UUID
+	if uuid, ok := data["uuid"].(string); ok {
+		user.UUID = uuid
+	}
+
+	// Extract username
+	if username, ok := data["username"].(string); ok {
+		user.Username = username
+	}
+
+	if user.UUID == "" && user.Username == "" {
+		return nil, fmt.Errorf("failed to extract user information from API response")
+	}
+
+	return user, nil
+}
+
+// parsePullRequest converts the API response to our PullRequest struct
+func parsePullRequest(data map[string]interface{}, workspace, repoSlug string) (*PullRequest, error) {
+	pr := &PullRequest{}
+
+	// ID
+	if id, ok := data["id"].(float64); ok {
+		pr.ID = int(id)
+	}
+
+	// Title
+	if title, ok := data["title"].(string); ok {
+		pr.Title = title
+	}
+
+	// Description
+	if desc, ok := data["description"].(string); ok {
+		pr.Description = desc
+	}
+
+	// State
+	if state, ok := data["state"].(string); ok {
+		pr.State = state
+	}
+
+	// Source branch
+	if source, ok := data["source"].(map[string]interface{}); ok {
+		if branch, ok := source["branch"].(map[string]interface{}); ok {
+			if name, ok := branch["name"].(string); ok {
+				pr.SourceBranch = name
+			}
+		}
+	}
+
+	// Destination branch
+	if dest, ok := data["destination"].(map[string]interface{}); ok {
+		if branch, ok := dest["branch"].(map[string]interface{}); ok {
+			if name, ok := branch["name"].(string); ok {
+				pr.DestinationBranch = name
+			}
+		}
+	}
+
+	// Author
+	if author, ok := data["author"].(map[string]interface{}); ok {
+		if displayName, ok := author["display_name"].(string); ok {
+			pr.Author = displayName
+		} else if username, ok := author["username"].(string); ok {
+			pr.Author = username
+		}
+	}
+
+	// Reviewers
+	pr.Reviewers = make([]string, 0)
+	if reviewers, ok := data["reviewers"].([]interface{}); ok {
+		for _, reviewerData := range reviewers {
+			if reviewer, ok := reviewerData.(map[string]interface{}); ok {
+				// Prefer UUID for matching, fallback to username
+				if uuid, ok := reviewer["uuid"].(string); ok && uuid != "" {
+					pr.Reviewers = append(pr.Reviewers, uuid)
+				} else if username, ok := reviewer["username"].(string); ok && username != "" {
+					pr.Reviewers = append(pr.Reviewers, username)
+				}
+			}
+		}
+	}
+
+	// Created on
+	if createdStr, ok := data["created_on"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, createdStr); err == nil {
+			pr.CreatedOn = t
+		}
+	}
+
+	// Updated on
+	if updatedStr, ok := data["updated_on"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, updatedStr); err == nil {
+			pr.UpdatedOn = t
+		}
+	}
+
+	// Web URL - construct from links or build manually
+	if links, ok := data["links"].(map[string]interface{}); ok {
+		if html, ok := links["html"].(map[string]interface{}); ok {
+			if href, ok := html["href"].(string); ok {
+				pr.WebURL = href
+			}
+		}
+	}
+
+	// If no web URL from links, construct it manually
+	if pr.WebURL == "" && pr.ID > 0 {
+		pr.WebURL = fmt.Sprintf("https://bitbucket.org/%s/%s/pull-requests/%d",
+			workspace, repoSlug, pr.ID)
+	}
+
+	return pr, nil
+}
+
 // ensureValidToken ensures the OAuth token is valid, refreshing if necessary
 func (c *RestClient) ensureValidToken() error {
 	if c.tokenStore.NeedsRefresh() {

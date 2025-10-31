@@ -33,7 +33,7 @@ Variable naming:
   - Service "documentgenerator" in eu-central-2 → ZURICH_DOCUMENTGENERATOR_IMAGE_URI
 
 The --env flag is used only to determine which AWS profile to use for authentication.
-The command will fail if the ECR repository doesn't exist. Use 'eiscli svc ecr --create' to create it first.
+The command will fail if the ECR repository doesn't exist. Use 'eiscli ecr --create' to create it first.
 
 If service-name is not provided, it will be auto-detected from the git repository.`,
 	Args: cobra.MaximumNArgs(1),
@@ -90,7 +90,7 @@ func getServiceNameForWorkspaceVar(args []string) string {
 		fmt.Printf("  %v\n", err)
 		fmt.Println("\nUsage:")
 		fmt.Println("  1. Run this command from within a git repository, or")
-		fmt.Println("  2. Provide a service name: eiscli svc ecr update-workspace-var <service-name>")
+		fmt.Println("  2. Provide a service name: eiscli ecr update-workspace-var <service-name>")
 		return ""
 	}
 
@@ -128,7 +128,7 @@ func updateWorkspaceVariableForRegion(ctx context.Context, cfg *config.Config, s
 	if !exists {
 		fmt.Printf("⚠️  ECR repository '%s' does not exist in %s (%s)\n\n", serviceName, regionName, region)
 		fmt.Println("You must create the ECR repository first:")
-		fmt.Printf("  eiscli svc ecr %s --region %s --create\n", serviceName, region)
+		fmt.Printf("  eiscli ecr %s --region %s --create\n", serviceName, region)
 		return fmt.Errorf("ECR repository does not exist")
 	}
 
