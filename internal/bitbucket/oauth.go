@@ -41,7 +41,10 @@ func init() {
 
 // OAuth scopes required for the CLI
 var requiredScopes = []string{
+	"account",           // Read account info (for @me in PR filters)
 	"repository",        // Read repositories
+	"pullrequest",       // Read pull requests
+	"pullrequest:write", // Create and manage pull requests
 	"pipeline",          // View pipelines
 	"pipeline:write",    // Trigger/manage pipelines
 	"pipeline:variable", // Manage pipeline variables

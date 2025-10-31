@@ -10,10 +10,18 @@ bitbucket:
   # 
   # Setup instructions:
   # 1. Go to https://bitbucket.org/[workspace]/workspace/settings/oauth-consumers/new
-  # 2. Create a new OAuth consumer:
+  # 2. Create a new OAuth consumer with these settings:
   #    - Name: "EIS CLI" (or your preference)
-  #    - Callback URL: http://localhost:PORT/callback (PORT is dynamic, use this exact format)
-  #    - Permissions: Repository (Read), Pipelines (Read/Write), Pipeline Variables, Webhooks
+  #    - Callback URL: http://localhost/callback
+  #       (Use any port or no port - the CLI handles dynamic ports automatically)
+  #    
+  #    Required Permissions (check these boxes):
+  #    ✓ Account: Read
+  #    ✓ Repositories: Read
+  #    ✓ Pull requests: Read, Write
+  #    ✓ Pipelines: Read, Write
+  #    ✓ Webhooks: Read, Write
+  #
   # 3. Copy the Key (client_id) and Secret (client_secret)
   # 4. Set them below and set use_oauth: true
   # 5. Run: eiscli auth login
@@ -27,7 +35,12 @@ bitbucket:
   # ==========================================
   # Only used if use_oauth is false or not set
   # Create an app password at: https://bitbucket.org/account/settings/app-passwords/
-  # Required scopes: pipelines:read, repositories:read, deployments:write
+  # 
+  # Required scopes:
+  # ✓ Repositories: Read
+  # ✓ Pull requests: Read, Write
+  # ✓ Pipelines: Read, Write
+  # ✓ Webhooks: Read, Write
   
   username: "your-username"
   app_password: "your-app-password"
