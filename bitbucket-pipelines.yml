@@ -66,11 +66,11 @@ definitions:
         name: Build Release with OAuth
         caches:
           - gomodules
+        variables:
+          BITBUCKET_OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID}
+          BITBUCKET_OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
         script:
           # OAuth credentials are injected from repository variables
-          - export BITBUCKET_OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
-          - export BITBUCKET_OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
-
           # Build release binary with OAuth credentials baked in
           - make build-release
 
@@ -87,15 +87,15 @@ definitions:
         name: Build Multi-Platform Release Binaries
         caches:
           - gomodules
+        variables:
+          BITBUCKET_OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID}
+          BITBUCKET_OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
         script:
           # Get version from git tag or commit
           - export VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
           - echo "Building version:$VERSION"
 
-          # OAuth credentials are injected from repository variables
-          - export BITBUCKET_OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID
-          - export BITBUCKET_OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
-
+          # OAuth credentials are injected from repository variables via step variables
           # Build for all platforms
           - make build-linux-amd64
           - make build-darwin-amd64
