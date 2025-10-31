@@ -117,7 +117,7 @@ eiscli svc pipeline --logs --log-lines 20
 
 - `-l, --limit`: Number of builds to display (default: 5)
 - `--logs`: Show pipeline steps and log snippets
-- `--log-lines`: Log lines per step (default: 10)
+- `--log-lines`: Log lines per step (default: 25)
 
 ### Variables
 

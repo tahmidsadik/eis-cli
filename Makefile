@@ -30,6 +30,14 @@ GOARCH ?= $(shell go env GOARCH)
 LDFLAGS = -X 'bitbucket.org/cover42/eiscli/internal/bitbucket.DefaultClientID=$(OAUTH_CLIENT_ID)' \
           -X 'bitbucket.org/cover42/eiscli/internal/bitbucket.DefaultClientSecret=$(OAUTH_CLIENT_SECRET)'
 
+# Optimized build flags for minimal binary size
+# -s: omit symbol table and debug information
+# -w: omit DWARF symbol table
+# -trimpath: remove file system paths from compiled binary
+# -buildmode=exe: build as executable (default, but explicit for clarity)
+BUILD_FLAGS = -ldflags "$(LDFLAGS) -s -w" -trimpath -buildmode=exe
+BUILD_ENV = CGO_ENABLED=0
+
 .PHONY: build
 build: ## Build the CLI (without OAuth credentials - for development)
 	@echo "Building $(BINARY_NAME)..."
@@ -64,7 +72,7 @@ build-release: ## Build optimized release binary with OAuth credentials
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME) .
+	$(BUILD_ENV) go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
 	@echo "✓ Release build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
 
@@ -76,7 +84,7 @@ build-linux-amd64: ## Build for Linux amd64 with version in filename
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64 .
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64 .
 	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-linux-amd64
 
@@ -88,7 +96,7 @@ build-darwin-amd64: ## Build for macOS amd64 (Intel) with version in filename
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64 .
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64 .
 	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-amd64
 
@@ -100,7 +108,7 @@ build-darwin-arm64: ## Build for macOS arm64 (Apple Silicon) with version in fil
 		echo "ERROR: OAuth credentials not set. Set BITBUCKET_OAUTH_CLIENT_ID and BITBUCKET_OAUTH_CLIENT_SECRET"; \
 		exit 1; \
 	fi
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS) -s -w" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64 .
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64 .
 	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-darwin-arm64
 
@@ -108,6 +116,54 @@ build-darwin-arm64: ## Build for macOS arm64 (Apple Silicon) with version in fil
 build-all-platforms: build-linux-amd64 build-darwin-amd64 build-darwin-arm64 ## Build for all supported platforms
 	@echo "✓ All platform builds complete"
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*
+
+.PHONY: build-all-platforms-compressed
+build-all-platforms-compressed: ## Build for all platforms and compress with UPX (requires UPX installed)
+	@echo "Building and compressing binaries for all platforms..."
+	@if ! command -v upx >/dev/null 2>&1; then \
+		echo "ERROR: UPX not installed. Install from https://upx.github.io/"; \
+		echo "   macOS: brew install upx"; \
+		echo "   Linux: apt-get install upx-ucl || yum install upx"; \
+		exit 1; \
+	fi
+	@$(MAKE) build-all-platforms
+	@echo "Compressing binaries with UPX..."
+	@for binary in $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*; do \
+		if [ -f "$$binary" ]; then \
+			echo "Compressing $$binary..."; \
+			upx --best --lzma "$$binary" || echo "Warning: UPX compression failed for $$binary"; \
+		fi \
+	done
+	@echo "✓ All platform builds complete (compressed)"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)-$(VERSION)-*
+
+.PHONY: compress-binary
+compress-binary: ## Compress existing binary with UPX (requires UPX installed)
+	@if [ ! -f "$(BUILD_DIR)/$(BINARY_NAME)" ]; then \
+		echo "ERROR: Binary $(BUILD_DIR)/$(BINARY_NAME) not found. Build it first."; \
+		exit 1; \
+	fi
+	@if ! command -v upx >/dev/null 2>&1; then \
+		echo "ERROR: UPX not installed. Install from https://upx.github.io/"; \
+		exit 1; \
+	fi
+	@echo "Compressing $(BUILD_DIR)/$(BINARY_NAME) with UPX..."
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
+	@upx --best --lzma $(BUILD_DIR)/$(BINARY_NAME)
+	@echo "✓ Binary compressed"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
+
+.PHONY: analyze-binary-size
+analyze-binary-size: build-release ## Analyze binary size and dependencies
+	@echo "Analyzing binary size..."
+	@echo "Binary: $(BUILD_DIR)/$(BINARY_NAME)"
+	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
+	@echo ""
+	@echo "Checking dependencies..."
+	@go list -m all | wc -l | xargs echo "Total dependencies:"
+	@echo ""
+	@echo "Top 10 largest dependencies (by binary size contribution):"
+	@go list -m -f '{{.Path}} {{.Version}}' all | head -10
 
 .PHONY: install
 install: build ## Install the CLI to GOPATH/bin

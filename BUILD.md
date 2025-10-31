@@ -58,6 +58,9 @@ This creates an optimized binary with:
 - Debug symbols stripped (`-s -w`)
 - Reproducible builds (`-trimpath`)
 - Static binary (`CGO_ENABLED=0`)
+- Explicit executable build mode (`-buildmode=exe`)
+
+The optimized build flags significantly reduce binary size compared to development builds.
 
 ## How It Works
 
@@ -269,7 +272,36 @@ ls -lh ./eiscli
 file ./eiscli
 ```
 
-Release builds are typically 10-15MB (depending on features).
+Release builds are typically **6-8MB** (optimized with `-s -w -trimpath` flags).
+
+### Analyze Binary Size and Dependencies
+
+```bash
+make analyze-binary-size
+```
+
+This shows:
+- Binary size
+- Total number of dependencies
+- Top dependencies
+
+### Further Size Reduction with UPX Compression
+
+For maximum size reduction (50-70% smaller), you can compress binaries with UPX:
+
+```bash
+# Install UPX first
+# macOS: brew install upx
+# Linux: apt-get install upx-ucl || yum install upx
+
+# Compress existing binary
+make compress-binary
+
+# Or build and compress all platforms at once
+make build-all-platforms-compressed
+```
+
+**Note:** UPX compression may trigger some antivirus software false positives. Test thoroughly before distribution.
 
 ## Distribution
 
@@ -359,16 +391,20 @@ bitbucket:
 ## Makefile Targets
 
 ```bash
-make help                 # Show all available targets
-make build                # Development build (no OAuth)
-make build-with-oauth     # Build with OAuth credentials
-make build-release        # Optimized release build
-make verify-oauth-build   # Verify OAuth injection
-make install              # Install to GOPATH/bin
-make install-with-oauth   # Install with OAuth
-make test                 # Run tests
-make clean                # Clean build artifacts
-make dist                 # Create distribution package
+make help                      # Show all available targets
+make build                     # Development build (no OAuth)
+make build-with-oauth          # Build with OAuth credentials
+make build-release             # Optimized release build
+make build-all-platforms       # Build for all platforms (Linux, macOS Intel, macOS ARM)
+make build-all-platforms-compressed  # Build and compress with UPX
+make compress-binary           # Compress existing binary with UPX
+make analyze-binary-size       # Analyze binary size and dependencies
+make verify-oauth-build        # Verify OAuth injection
+make install                   # Install to GOPATH/bin
+make install-with-oauth        # Install with OAuth
+make test                      # Run tests
+make clean                     # Clean build artifacts
+make dist                      # Create distribution package
 ```
 
 ## Creating a Release
