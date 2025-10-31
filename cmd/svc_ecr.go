@@ -134,7 +134,7 @@ func checkAllRegions(ctx context.Context, cfg *config.Config, serviceName string
 			fmt.Printf("   Console: %s\n", consoleURL)
 		} else {
 			fmt.Printf("⚠️  Repository not found\n")
-			fmt.Printf("   To create: eiscli svc ecr %s --region %s --create\n", serviceName, reg.region)
+			fmt.Printf("   To create: eiscli ecr %s --region %s --create\n", serviceName, reg.region)
 		}
 	}
 }
@@ -163,7 +163,7 @@ func handleRepositoryNotFound(ctx context.Context, client *aws.ECRClient, cfg *c
 		createRepository(ctx, client, serviceName)
 	} else {
 		fmt.Printf("To create the repository, run:\n")
-		fmt.Printf("  eiscli svc ecr %s --region %s --create\n", serviceName, region)
+		fmt.Printf("  eiscli ecr %s --region %s --create\n", serviceName, region)
 	}
 }
 
@@ -195,7 +195,7 @@ func createRepository(ctx context.Context, client *aws.ECRClient, defaultName st
 }
 
 func init() {
-	svcCmd.AddCommand(svcECRCmd)
+	rootCmd.AddCommand(svcECRCmd)
 
 	svcECRCmd.Flags().StringVarP(&ecrRegion, "region", "r", "eu-central-1",
 		"AWS region (eu-central-1 or eu-central-2)")

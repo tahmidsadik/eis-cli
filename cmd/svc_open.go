@@ -20,7 +20,7 @@ in the current directory (based on the git remote URL).
 Subcommands:
   pipelines  - Open the pipelines page
   prs        - Open the pull requests page
-  vars       - Open the deployment variables page
+  vars       - Open the variables page (deployment or repository)
   settings   - Open the repository settings page`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -40,7 +40,7 @@ Subcommands:
 	},
 }
 
-var pipelinesCmd = &cobra.Command{
+var openPipelinesCmd = &cobra.Command{
 	Use:   "pipelines [service-name]",
 	Short: "Open pipelines page in browser",
 	Long: `Open the Bitbucket pipelines page in your default browser and print the URL.
@@ -90,10 +90,14 @@ in the current directory.`,
 	},
 }
 
-var varsCmd = &cobra.Command{
+var openVarsType string
+
+var openVarsCmd = &cobra.Command{
 	Use:   "vars [service-name]",
-	Short: "Open deployment variables page in browser",
-	Long: `Open the Bitbucket deployment variables settings page in your default browser and print the URL.
+	Short: "Open variables page in browser",
+	Long: `Open the Bitbucket variables settings page in your default browser and print the URL.
+
+By default, opens the deployment variables page. Use --type repository to open the repository variables page.
 
 If service-name is not provided, it will be auto-detected from the git repository
 in the current directory.`,
@@ -110,8 +114,16 @@ in the current directory.`,
 			return
 		}
 
-		url := bitbucket.BuildDeploymentVariablesURL(cfg.Bitbucket.Workspace, serviceName)
-		openURL(url, serviceName, "deployment variables")
+		var url string
+		var pageType string
+		if openVarsType == "repository" {
+			url = bitbucket.BuildRepositoryVariablesURL(cfg.Bitbucket.Workspace, serviceName)
+			pageType = "repository variables"
+		} else {
+			url = bitbucket.BuildDeploymentVariablesURL(cfg.Bitbucket.Workspace, serviceName)
+			pageType = "deployment variables"
+		}
+		openURL(url, serviceName, pageType)
 	},
 }
 
@@ -155,9 +167,10 @@ func openURL(url, serviceName, pageType string) {
 }
 
 func init() {
-	svcCmd.AddCommand(svcOpenCmd)
-	svcOpenCmd.AddCommand(pipelinesCmd)
+	rootCmd.AddCommand(svcOpenCmd)
+	svcOpenCmd.AddCommand(openPipelinesCmd)
 	svcOpenCmd.AddCommand(prsCmd)
-	svcOpenCmd.AddCommand(varsCmd)
+	svcOpenCmd.AddCommand(openVarsCmd)
 	svcOpenCmd.AddCommand(settingsCmd)
+	openVarsCmd.Flags().StringVarP(&openVarsType, "type", "t", "deployment", "Type of variables page to open (deployment, repository)")
 }

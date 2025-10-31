@@ -99,7 +99,7 @@ This command will register the service in all API ingress files for the specifie
 }
 
 func init() {
-	svcCmd.AddCommand(svcIngressCmd)
+	rootCmd.AddCommand(svcIngressCmd)
 	svcIngressCmd.AddCommand(svcIngressAddCmd)
 
 	svcIngressAddCmd.Flags().StringVarP(&serviceName, "service", "s", "", "Service name (required)")
@@ -208,7 +208,7 @@ func verifyRepository() error {
 		return nil
 	}
 
-	return fmt.Errorf("This command must be run from the dist-orchestration repository root directory")
+	return fmt.Errorf("command must be run from the dist-orchestration repository root directory")
 }
 
 // getBasePath returns the base path for dist-orchestration files
