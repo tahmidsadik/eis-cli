@@ -67,10 +67,10 @@ eiscli svc list
 
 # View recent pipeline builds (auto-detects from git repo)
 cd /path/to/your/service
-eiscli svc pipeline
+eiscli pipelines
 
 # List deployment variables
-eiscli svc variables --env Test
+eiscli vars --env Test
 ```
 
 ## Commands
@@ -104,13 +104,13 @@ eiscli svc list
 
 ```bash
 # View recent pipeline builds (default: last 5)
-eiscli svc pipeline [service-name]
+eiscli pipelines [service-name]
 
 # View more builds
-eiscli svc pipeline -l 10
+eiscli pipelines -l 10
 
 # View with detailed steps and logs
-eiscli svc pipeline --logs --log-lines 20
+eiscli pipelines --logs --log-lines 20
 ```
 
 **Options:**
@@ -123,16 +123,16 @@ eiscli svc pipeline --logs --log-lines 20
 
 ```bash
 # List deployment variables (default: Test environment)
-eiscli svc variables [service-name]
+eiscli vars [service-name]
 
 # List for specific environment
-eiscli svc variables --env Staging
+eiscli vars --env Staging
 
 # List all environments
-eiscli svc variables --all
+eiscli vars --all
 
 # List repository variables
-eiscli svc variables --type repository
+eiscli vars --type repository
 ```
 
 **Options:**
@@ -148,13 +148,13 @@ Syncs variables from Kubernetes `.env.template` files to Bitbucket. Shows previe
 
 ```bash
 # Preview changes (no modifications)
-eiscli svc variables sync --env testing
+eiscli vars sync --env testing
 
 # Apply changes (prompts for confirmation)
-eiscli svc variables sync --env prod --apply
+eiscli vars sync --env prod --apply
 
 # Custom kubernetes path
-eiscli svc variables sync --env staging --kubernetes-path ./k8s --apply
+eiscli vars sync --env staging --kubernetes-path ./k8s --apply
 ```
 
 **Options:**
@@ -179,10 +179,10 @@ Register a microservice in the API Gateway ingress controller. Must be run from 
 
 ```bash
 # Add service to test environment
-eiscli svc ingress add --service myservice --env test
+eiscli ingress add --service myservice --env test
 
 # Add to production in Zurich
-eiscli svc ingress add --service myservice --env prod --region zurich
+eiscli ingress add --service myservice --env prod --region zurich
 ```
 
 **Options:**
@@ -197,16 +197,16 @@ Check and manage AWS ECR registries. Auto-selects AWS profile based on environme
 
 ```bash
 # Check ECR registry (default: testing)
-eiscli svc ecr [service-name]
+eiscli ecr [service-name]
 
 # Check specific environment
-eiscli svc ecr --env staging
+eiscli ecr --env staging
 
 # Check all environments
-eiscli svc ecr --all
+eiscli ecr --all
 
 # Create if doesn't exist
-eiscli svc ecr --create
+eiscli ecr --create
 ```
 
 **Options:**
