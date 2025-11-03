@@ -101,12 +101,15 @@ definitions:
           - make build-darwin-amd64
           - make build-darwin-arm64
 
+          # Create latest binaries
+          - make create-latest-binaries
+
           # List built binaries
           - ls -lh eiscli-*
         artifacts:
-          - eiscli-*-linux-amd64
-          - eiscli-*-darwin-amd64
-          - eiscli-*-darwin-arm64
+          - eiscli-*-linux-amd64-*
+          - eiscli-*-darwin-amd64-*
+          - eiscli-*-darwin-arm64-*
 
     - step: &upload-downloads-step
         name: Upload to Bitbucket Downloads
@@ -114,28 +117,51 @@ definitions:
           - export VERSION=${BITBUCKET_TAG}
           - echo "Uploading version $VERSION to Downloads..."
 
-          # Upload Linux binary
+          # Upload versioned binaries
+          # Upload Linux binary (versioned)
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
-              FILENAME: "eiscli-${VERSION}-linux-amd64"
+              FILENAME: "eiscli-linux-amd64-${VERSION}"
 
-          # Upload macOS Intel binary
+          # Upload macOS Intel binary (versioned)
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
-              FILENAME: "eiscli-${VERSION}-darwin-amd64"
+              FILENAME: "eiscli-darwin-amd64-${VERSION}"
 
-          # Upload macOS Apple Silicon binary
+          # Upload macOS Apple Silicon binary (versioned)
           - pipe: atlassian/bitbucket-upload-file:0.3.3
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
-              FILENAME: "eiscli-${VERSION}-darwin-arm64"
+              FILENAME: "eiscli-darwin-arm64-${VERSION}"
 
-          - echo "✓ All platform binaries uploaded to Downloads section"
+          # Upload latest binaries
+          # Upload Linux binary (latest)
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-linux-amd64-latest"
+
+          # Upload macOS Intel binary (latest)
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-darwin-amd64-latest"
+
+          # Upload macOS Apple Silicon binary (latest)
+          - pipe: atlassian/bitbucket-upload-file:0.3.3
+            variables:
+              BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
+              BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
+              FILENAME: "eiscli-darwin-arm64-latest"
+
+          - echo "✓ All platform binaries (versioned and latest) uploaded to Downloads section"
 
 pipelines:
   default:
