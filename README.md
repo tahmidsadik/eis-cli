@@ -4,14 +4,6 @@ A command-line tool for managing services, repositories, pipelines, and deployme
 
 ## Installation
 
-### Quick Install (Recommended)
-
-```bash
-curl -fsSL https://bitbucket.org/cover42/eis-cli/downloads/install.sh | bash
-```
-
-This script automatically detects your OS and architecture, downloads the latest binary, and installs it to `/usr/local/bin/eiscli`.
-
 ### Download Binary
 
 Download the latest release for your platform:
