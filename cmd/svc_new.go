@@ -317,9 +317,9 @@ func selectProject(client *bitbucket.Client, defaultProjectName string) (*bitbuc
 	)
 
 	if err != nil {
-		// Check if user cancelled (Ctrl+C or ESC)
+		// Check if user canceled (Ctrl+C or ESC)
 		if err == fuzzyfinder.ErrAbort {
-			fmt.Printf("\nCancelled. Repository will be created without project assignment.\n")
+			fmt.Printf("\nCanceled. Repository will be created without project assignment.\n")
 			return nil, nil
 		}
 		return nil, fmt.Errorf("project selection failed: %w", err)
