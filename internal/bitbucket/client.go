@@ -328,6 +328,14 @@ type Repository struct {
 	FullName    string
 }
 
+// Project represents a Bitbucket project
+type Project struct {
+	Key         string
+	Name        string
+	Description string
+	UUID        string
+}
+
 // Variable represents a Bitbucket pipeline or deployment variable
 type Variable struct {
 	Key     string
@@ -449,6 +457,36 @@ func (c *Client) GetDefaultBranch(repoSlug string) (string, error) {
 func (c *Client) ListRepositories() ([]*Repository, error) {
 	// Use the REST client for better reliability
 	return c.restClient.ListRepositories()
+}
+
+// ListProjects retrieves all projects in the workspace
+func (c *Client) ListProjects() ([]*Project, error) {
+	rawProjects, err := c.restClient.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	projects := make([]*Project, 0, len(rawProjects))
+	for _, projectData := range rawProjects {
+		project := &Project{}
+
+		if key, ok := projectData["key"].(string); ok {
+			project.Key = key
+		}
+		if name, ok := projectData["name"].(string); ok {
+			project.Name = name
+		}
+		if desc, ok := projectData["description"].(string); ok {
+			project.Description = desc
+		}
+		if uuid, ok := projectData["uuid"].(string); ok {
+			project.UUID = uuid
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, nil
 }
 
 // GetRepositoryVariables retrieves repository-level pipeline variables
@@ -682,4 +720,57 @@ func (c *Client) CreateOrUpdateWorkspaceVariable(key, value string, secured bool
 		return false, "", fmt.Errorf("failed to create workspace variable: %w", err)
 	}
 	return false, "", nil
+}
+
+// CreateRepository creates a new repository in Bitbucket
+func (c *Client) CreateRepository(repoSlug, projectKey string, isPrivate bool) (*Repository, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+
+	data, err := c.restClient.CreateRepository(repoSlug, projectKey, isPrivate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response into Repository struct
+	repo := &Repository{}
+	if slug, ok := data["slug"].(string); ok {
+		repo.Slug = slug
+	}
+	if name, ok := data["name"].(string); ok {
+		repo.Name = name
+	}
+	if desc, ok := data["description"].(string); ok {
+		repo.Description = desc
+	}
+	if fullName, ok := data["full_name"].(string); ok {
+		repo.FullName = fullName
+	}
+
+	return repo, nil
+}
+
+// SetRepositoryPermissions sets permissions for a group on a repository
+func (c *Client) SetRepositoryPermissions(repoSlug, groupSlug, permission string) error {
+	if repoSlug == "" || groupSlug == "" {
+		return fmt.Errorf("repository slug and group slug are required")
+	}
+	if permission == "" {
+		return fmt.Errorf("permission is required")
+	}
+
+	return c.restClient.SetRepositoryPermissions(repoSlug, groupSlug, permission)
+}
+
+// SetRepositoryDefaultBranch sets the default branch for a repository
+func (c *Client) SetRepositoryDefaultBranch(repoSlug, branchName string) error {
+	if repoSlug == "" {
+		return fmt.Errorf("repository slug is required")
+	}
+	if branchName == "" {
+		return fmt.Errorf("branch name is required")
+	}
+
+	return c.restClient.SetRepositoryDefaultBranch(repoSlug, branchName)
 }

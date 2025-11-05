@@ -106,56 +106,111 @@ definitions:
 
           # List built binaries
           - ls -lh eiscli-*
+
+          # Export version for use in upload step
+          - echo "VERSION=${VERSION}" > version.env
         artifacts:
-          - eiscli-*-linux-amd64-*
-          - eiscli-*-darwin-amd64-*
-          - eiscli-*-darwin-arm64-*
+          - eiscli-linux-amd64-*
+          - eiscli-darwin-amd64-*
+          - eiscli-darwin-arm64-*
+          - version.env
 
     - step: &upload-downloads-step
         name: Upload to Bitbucket Downloads
+        variables:
+          VERSION: ${BITBUCKET_TAG}
         script:
-          - export VERSION=${BITBUCKET_TAG}
-          - echo "Uploading version $VERSION to Downloads..."
+          # Load version from artifact or use BITBUCKET_TAG
+          # Export VERSION so pipes can access it
+          - |
+            if [ -f version.env ]; then
+              source version.env
+            else
+              export VERSION=${BITBUCKET_TAG}
+            fi
+            # Ensure VERSION is exported for pipes
+            export VERSION
+            echo "Uploading version $VERSION to Downloads..."
+
+          # List all available files to debug
+          - |
+            echo "Available files in current directory:"
+            ls -lah
+            echo ""
+            echo "Looking for eiscli binaries:"
+            ls -lah eiscli-* 2>/dev/null || echo "No eiscli files found"
+            echo "VERSION variable: $VERSION"
+
+          # Verify versioned binaries exist before uploading
+          - |
+            LINUX_FILE="eiscli-linux-amd64-${VERSION}"
+            DARWIN_AMD64_FILE="eiscli-darwin-amd64-${VERSION}"
+            DARWIN_ARM64_FILE="eiscli-darwin-arm64-${VERSION}"
+
+            echo "Checking for binaries:"
+            echo "  Linux: $LINUX_FILE"
+            echo "  Darwin amd64: $DARWIN_AMD64_FILE"
+            echo "  Darwin arm64: $DARWIN_ARM64_FILE"
+
+            # Verify files exist
+            if [ ! -f "$LINUX_FILE" ] || [ ! -f "$DARWIN_AMD64_FILE" ] || [ ! -f "$DARWIN_ARM64_FILE" ]; then
+              echo "ERROR: One or more versioned binaries not found"
+              echo "Available files:"
+              ls -lah eiscli-* 2>/dev/null || echo "No eiscli files found"
+              exit 1
+            fi
+
+            echo "✓ All versioned binaries found"
 
           # Upload versioned binaries
           # Upload Linux binary (versioned)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-linux-amd64-${VERSION}"
 
           # Upload macOS Intel binary (versioned)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-darwin-amd64-${VERSION}"
 
           # Upload macOS Apple Silicon binary (versioned)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-darwin-arm64-${VERSION}"
 
+          # Verify latest binaries exist before uploading
+          - |
+            if [ ! -f "eiscli-linux-amd64-latest" ] || [ ! -f "eiscli-darwin-amd64-latest" ] || [ ! -f "eiscli-darwin-arm64-latest" ]; then
+              echo "ERROR: One or more latest binaries not found"
+              echo "Available files matching pattern:"
+              ls -lah eiscli-*-latest 2>/dev/null || echo "No matching files"
+              exit 1
+            fi
+            echo "✓ All latest binaries found"
+
           # Upload latest binaries
           # Upload Linux binary (latest)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-linux-amd64-latest"
 
           # Upload macOS Intel binary (latest)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN
               FILENAME: "eiscli-darwin-amd64-latest"
 
           # Upload macOS Apple Silicon binary (latest)
-          - pipe: atlassian/bitbucket-upload-file:0.3.3
+          - pipe: atlassian/bitbucket-upload-file:0.7.5
             variables:
               BITBUCKET_USERNAME: $ATLASSIAN_ACCOUNT_EMAIL
               BITBUCKET_APP_PASSWORD: $ATLASSIAN_API_TOKEN

@@ -256,6 +256,28 @@ func (c *RestClient) ListRepositories() ([]*Repository, error) {
 	return repositories, nil
 }
 
+// ListProjects fetches all projects in the workspace
+func (c *RestClient) ListProjects() ([]map[string]interface{}, error) {
+	path := fmt.Sprintf("/workspaces/%s/projects", c.workspace)
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		return nil, err
+	}
+
+	projects := make([]map[string]interface{}, 0)
+
+	if values, ok := data["values"].([]interface{}); ok {
+		for _, v := range values {
+			if projectData, ok := v.(map[string]interface{}); ok {
+				projects = append(projects, projectData)
+			}
+		}
+	}
+
+	return projects, nil
+}
+
 // GetPipelineSteps fetches steps for a specific pipeline
 func (c *RestClient) GetPipelineSteps(repoSlug, pipelineUUID string) ([]*PipelineStep, error) {
 	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/",
@@ -815,6 +837,64 @@ func parsePullRequest(data map[string]interface{}, workspace, repoSlug string) (
 	}
 
 	return pr, nil
+}
+
+// CreateRepository creates a new repository in Bitbucket
+func (c *RestClient) CreateRepository(repoSlug, projectKey string, isPrivate bool) (map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s", c.workspace, repoSlug)
+
+	requestBody := map[string]interface{}{
+		"scm":        "git",
+		"is_private": isPrivate,
+	}
+
+	if projectKey != "" {
+		requestBody["project"] = map[string]interface{}{
+			"key": projectKey,
+		}
+	}
+
+	data, err := c.doRequestWithBody("POST", path, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository: %w", err)
+	}
+
+	return data, nil
+}
+
+// SetRepositoryPermissions sets permissions for a group on a repository
+func (c *RestClient) SetRepositoryPermissions(repoSlug, groupSlug, permission string) error {
+	path := fmt.Sprintf("/repositories/%s/%s/permissions-config/groups/%s",
+		c.workspace, repoSlug, groupSlug)
+
+	requestBody := map[string]interface{}{
+		"permission": permission,
+	}
+
+	_, err := c.doRequestWithBody("PUT", path, requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to set repository permissions: %w", err)
+	}
+
+	return nil
+}
+
+// SetRepositoryDefaultBranch sets the default branch for a repository
+func (c *RestClient) SetRepositoryDefaultBranch(repoSlug, branchName string) error {
+	path := fmt.Sprintf("/repositories/%s/%s", c.workspace, repoSlug)
+
+	requestBody := map[string]interface{}{
+		"mainbranch": map[string]interface{}{
+			"name": branchName,
+		},
+	}
+
+	_, err := c.doRequestWithBody("PUT", path, requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to set default branch: %w", err)
+	}
+
+	return nil
 }
 
 // ensureValidToken ensures the OAuth token is valid, refreshing if necessary
