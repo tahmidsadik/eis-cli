@@ -12,7 +12,7 @@ var rootCmd = &cobra.Command{
 	Short: "EIS CLI - Manage services and repositories of the EIS platform",
 	Long: `EIS CLI is a command-line tool for developers working with the EIS platform.
 It helps manage services, repositories, pipelines, and deployment configurations.`,
-	Version: "0.1.0",
+	Version: "0.3.0",
 }
 
 // Execute runs the root command
