@@ -897,6 +897,83 @@ func (c *RestClient) SetRepositoryDefaultBranch(repoSlug, branchName string) err
 	return nil
 }
 
+// GetPipelineSSHKeyPair retrieves the SSH key pair for a repository's pipelines
+// Returns nil if no key pair exists (404 response)
+func (c *RestClient) GetPipelineSSHKeyPair(repoSlug string) (map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines_config/ssh/key_pair",
+		c.workspace, repoSlug)
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		// Check if it's a 404 (key pair doesn't exist)
+		if strings.Contains(err.Error(), "404") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get SSH key pair: %w", err)
+	}
+
+	return data, nil
+}
+
+// CreatePipelineSSHKeyPair creates or updates the SSH key pair for a repository's pipelines
+func (c *RestClient) CreatePipelineSSHKeyPair(repoSlug, privateKey, publicKey string) (map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines_config/ssh/key_pair",
+		c.workspace, repoSlug)
+
+	requestBody := map[string]interface{}{
+		"private_key": privateKey,
+		"public_key":  publicKey,
+	}
+
+	data, err := c.doRequestWithBody("PUT", path, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SSH key pair: %w", err)
+	}
+
+	return data, nil
+}
+
+// ListDeployKeys retrieves all deploy keys for a repository
+func (c *RestClient) ListDeployKeys(repoSlug string) ([]map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/deploy-keys",
+		c.workspace, repoSlug)
+
+	data, err := c.doRequest("GET", path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deploy keys: %w", err)
+	}
+
+	deployKeys := make([]map[string]interface{}, 0)
+
+	if values, ok := data["values"].([]interface{}); ok {
+		for _, v := range values {
+			if keyData, ok := v.(map[string]interface{}); ok {
+				deployKeys = append(deployKeys, keyData)
+			}
+		}
+	}
+
+	return deployKeys, nil
+}
+
+// CreateDeployKey adds a new deploy key to a repository
+func (c *RestClient) CreateDeployKey(repoSlug, key, label string) (map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/deploy-keys",
+		c.workspace, repoSlug)
+
+	requestBody := map[string]interface{}{
+		"key":   key,
+		"label": label,
+	}
+
+	data, err := c.doRequestWithBody("POST", path, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create deploy key: %w", err)
+	}
+
+	return data, nil
+}
+
 // ensureValidToken ensures the OAuth token is valid, refreshing if necessary
 func (c *RestClient) ensureValidToken() error {
 	if c.tokenStore.NeedsRefresh() {

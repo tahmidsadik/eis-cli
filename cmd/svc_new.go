@@ -106,6 +106,28 @@ func createNewService(serviceName string) error {
 	fmt.Printf("\n✓ Service '%s' created successfully!\n", color.GreenString(serviceName))
 	fmt.Printf("  Directory: %s\n", destDir)
 
+	// Ask if user wants to link SSH key to protorepo (default: Yes)
+	fmt.Printf("\nAdd SSH access key to protorepo for CI/CD? [Y/n]: ")
+	sshResponse, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Warning: Failed to read input: %v\n", err)
+		fmt.Printf("You can run 'eiscli ssh-link %s' later to set up SSH access.\n", serviceName)
+		return nil
+	}
+
+	sshResponse = strings.TrimSpace(strings.ToLower(sshResponse))
+	// Default to "yes" if user just presses Enter (empty response)
+	if sshResponse == "" || sshResponse == "y" || sshResponse == "yes" {
+		fmt.Printf("\n")
+		if err := executeSSHLink(serviceName, "protorepo", false, false); err != nil {
+			fmt.Printf("\nWarning: Failed to link SSH key: %v\n", err)
+			fmt.Printf("You can run 'eiscli ssh-link %s' later to set up SSH access.\n", serviceName)
+		}
+	} else {
+		fmt.Printf("Skipping SSH key setup.\n")
+		fmt.Printf("You can run 'eiscli ssh-link %s' later to set up SSH access.\n", serviceName)
+	}
+
 	return nil
 }
 

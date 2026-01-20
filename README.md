@@ -98,7 +98,44 @@ Most commands auto-detect the service name from your current git repository.
 ```bash
 # List all services
 eiscli svc list
+
+# Create a new service from template
+eiscli svc new myservice
 ```
+
+### SSH Key Linking
+
+Link SSH keys from a microservice to protorepo for CI/CD pipeline access. This automates the process of setting up SSH access so pipelines can clone the shared protorepo.
+
+```bash
+# Auto-detect service from current git repo and link to protorepo
+eiscli ssh-link
+
+# Specify service name explicitly
+eiscli ssh-link myservice
+
+# Preview what would be done without making changes
+eiscli ssh-link --dry-run
+
+# Force regenerate SSH key pair even if one exists
+eiscli ssh-link --force
+
+# Link to a different target repository
+eiscli ssh-link --target my-shared-repo
+```
+
+**Options:**
+
+- `-t, --target`: Target repository for deploy key (default: protorepo)
+- `-f, --force`: Force regenerate SSH key pair even if one exists
+- `--dry-run`: Show what would be done without making changes
+
+**What it does:**
+
+1. Checks if an SSH key pair exists in the service's Bitbucket pipeline config
+2. If not (or if `--force`), generates a new ED25519 SSH key pair
+3. Stores the key pair in the service's pipeline SSH configuration
+4. Adds the public key as a deploy key to the target repository (protorepo)
 
 ### Pipelines
 

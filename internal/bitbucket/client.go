@@ -774,3 +774,159 @@ func (c *Client) SetRepositoryDefaultBranch(repoSlug, branchName string) error {
 
 	return c.restClient.SetRepositoryDefaultBranch(repoSlug, branchName)
 }
+
+// SSHKeyPair represents a pipeline SSH key pair
+type SSHKeyPair struct {
+	PublicKey string
+}
+
+// DeployKey represents a repository deploy key
+type DeployKey struct {
+	ID       int
+	Key      string
+	Label    string
+	Comment  string
+	AddedOn  time.Time
+	LastUsed *time.Time
+}
+
+// GetPipelineSSHKeyPair retrieves the SSH key pair for a repository's pipelines
+// Returns nil if no key pair exists
+func (c *Client) GetPipelineSSHKeyPair(repoSlug string) (*SSHKeyPair, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+
+	data, err := c.restClient.GetPipelineSSHKeyPair(repoSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		return nil, nil
+	}
+
+	keyPair := &SSHKeyPair{}
+	if publicKey, ok := data["public_key"].(string); ok {
+		keyPair.PublicKey = publicKey
+	}
+
+	return keyPair, nil
+}
+
+// CreatePipelineSSHKeyPair creates or updates the SSH key pair for a repository's pipelines
+func (c *Client) CreatePipelineSSHKeyPair(repoSlug, privateKey, publicKey string) (*SSHKeyPair, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+	if privateKey == "" || publicKey == "" {
+		return nil, fmt.Errorf("private key and public key are required")
+	}
+
+	data, err := c.restClient.CreatePipelineSSHKeyPair(repoSlug, privateKey, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPair := &SSHKeyPair{}
+	if pk, ok := data["public_key"].(string); ok {
+		keyPair.PublicKey = pk
+	}
+
+	return keyPair, nil
+}
+
+// ListDeployKeys retrieves all deploy keys for a repository
+func (c *Client) ListDeployKeys(repoSlug string) ([]*DeployKey, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+
+	rawKeys, err := c.restClient.ListDeployKeys(repoSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	deployKeys := make([]*DeployKey, 0, len(rawKeys))
+	for _, keyData := range rawKeys {
+		deployKey := &DeployKey{}
+
+		if id, ok := keyData["id"].(float64); ok {
+			deployKey.ID = int(id)
+		}
+		if key, ok := keyData["key"].(string); ok {
+			deployKey.Key = key
+		}
+		if label, ok := keyData["label"].(string); ok {
+			deployKey.Label = label
+		}
+		if comment, ok := keyData["comment"].(string); ok {
+			deployKey.Comment = comment
+		}
+		if addedOnStr, ok := keyData["added_on"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, addedOnStr); err == nil {
+				deployKey.AddedOn = t
+			}
+		}
+		if lastUsedStr, ok := keyData["last_used"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, lastUsedStr); err == nil {
+				deployKey.LastUsed = &t
+			}
+		}
+
+		deployKeys = append(deployKeys, deployKey)
+	}
+
+	return deployKeys, nil
+}
+
+// AddDeployKey adds a new deploy key to a repository
+func (c *Client) AddDeployKey(repoSlug, key, label string) (*DeployKey, error) {
+	if repoSlug == "" {
+		return nil, fmt.Errorf("repository slug is required")
+	}
+	if key == "" {
+		return nil, fmt.Errorf("key is required")
+	}
+	if label == "" {
+		return nil, fmt.Errorf("label is required")
+	}
+
+	data, err := c.restClient.CreateDeployKey(repoSlug, key, label)
+	if err != nil {
+		return nil, err
+	}
+
+	deployKey := &DeployKey{}
+	if id, ok := data["id"].(float64); ok {
+		deployKey.ID = int(id)
+	}
+	if k, ok := data["key"].(string); ok {
+		deployKey.Key = k
+	}
+	if l, ok := data["label"].(string); ok {
+		deployKey.Label = l
+	}
+	if comment, ok := data["comment"].(string); ok {
+		deployKey.Comment = comment
+	}
+
+	return deployKey, nil
+}
+
+// FindDeployKeyByLabel searches for a deploy key with a specific label in a repository
+// Returns nil if no key with that label is found
+func (c *Client) FindDeployKeyByLabel(repoSlug, label string) (*DeployKey, error) {
+	deployKeys, err := c.ListDeployKeys(repoSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, key := range deployKeys {
+		if key.Label == label {
+			return key, nil
+		}
+	}
+
+	return nil, nil
+}
