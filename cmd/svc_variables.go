@@ -26,8 +26,10 @@ var varsCmd = &cobra.Command{
 	Long: `Display deployment variables and repository variables configured in Bitbucket.
 These variables are used in pipeline builds and deployments.
 
-By default, shows deployment variables for the "Test" environment.
-Use --type repository to view repository-level variables.
+By default, shows repository variables combined with deployment variables for the "Test" environment.
+Use --type repository to view only repository-level variables.
+Use --type deployment to view only deployment variables.
+Use --type workspace to view workspace-level variables (no service-name needed).
 Use --env to filter by a specific environment (deployment variables only).
 Use --all to show all environments (deployment variables only).
 
@@ -39,27 +41,7 @@ If service-name is not provided, it will be auto-detected from the git repositor
 in the current directory (based on the git remote URL).`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		serviceName := ""
-		if len(args) > 0 {
-			serviceName = args[0]
-		}
-
-		// Auto-detect service name from git repository if not provided
-		if serviceName == "" {
-			detectedSlug, err := git.DetectRepositorySlug()
-			if err != nil {
-				fmt.Println("Error: No service name provided and could not auto-detect from git repository")
-				fmt.Printf("  %v\n", err)
-				fmt.Println("\nUsage:")
-				fmt.Println("  1. Run this command from within a git repository, or")
-				fmt.Println("  2. Provide a service name: eiscli vars <service-name>")
-				return
-			}
-			serviceName = detectedSlug
-			fmt.Printf("Auto-detected service from git repository: %s\n\n", serviceName)
-		}
-
-		// Load configuration
+		// Load configuration first (needed for all types)
 		cfg, err := config.Load()
 		if err != nil {
 			fmt.Printf("Error loading configuration: %v\n", err)
@@ -83,13 +65,149 @@ in the current directory (based on the git remote URL).`,
 			return
 		}
 
+		// Handle workspace variables separately (no service-name needed)
+		if variableType == "workspace" {
+			displayWorkspaceVariables(client)
+			return
+		}
+
+		// For all other types, we need a service name
+		serviceName := ""
+		if len(args) > 0 {
+			serviceName = args[0]
+		}
+
+		// Auto-detect service name from git repository if not provided
+		if serviceName == "" {
+			detectedSlug, err := git.DetectRepositorySlug()
+			if err != nil {
+				fmt.Println("Error: No service name provided and could not auto-detect from git repository")
+				fmt.Printf("  %v\n", err)
+				fmt.Println("\nUsage:")
+				fmt.Println("  1. Run this command from within a git repository, or")
+				fmt.Println("  2. Provide a service name: eiscli vars <service-name>")
+				return
+			}
+			serviceName = detectedSlug
+			fmt.Printf("Auto-detected service from git repository: %s\n\n", serviceName)
+		}
+
 		// Handle based on variable type
-		if variableType == "repository" {
+		switch variableType {
+		case "repository":
 			displayRepositoryVariables(client, serviceName)
-		} else { // deployment is default
+		case "deployment":
 			displayDeploymentVariables(client, serviceName)
+		default: // "combined" or empty - this is the new default
+			displayCombinedVariables(client, serviceName)
 		}
 	},
+}
+
+func displayWorkspaceVariables(client *bitbucket.Client) {
+	fmt.Println("Workspace Variables")
+
+	variables, err := client.GetWorkspaceVariables()
+	if err != nil {
+		fmt.Printf("Error fetching workspace variables: %v\n", err)
+		return
+	}
+
+	if len(variables) == 0 {
+		fmt.Println("No workspace variables found.")
+		return
+	}
+
+	// Create table
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("Name", "Value", "Secured")
+
+	for _, v := range variables {
+		value := v.Value
+		if v.Secured {
+			value = "********"
+		}
+		securedStr := "No"
+		if v.Secured {
+			securedStr = "Yes"
+		}
+		table.Append(v.Key, value, securedStr)
+	}
+
+	table.Render()
+	fmt.Printf("\nTotal: %d variable(s)\n", len(variables))
+}
+
+func displayCombinedVariables(client *bitbucket.Client, serviceName string) {
+	fmt.Printf("Variables for: %s (Repository + Test Environment)\n\n", serviceName)
+
+	// Fetch repository variables
+	repoVariables, repoErr := client.GetRepositoryVariables(serviceName)
+	if repoErr != nil {
+		fmt.Printf("Warning: Could not fetch repository variables: %v\n", repoErr)
+		repoVariables = []*bitbucket.Variable{}
+	}
+
+	// Fetch deployment environments to find Test environment
+	var deploymentVariables []*bitbucket.Variable
+	environments, envErr := client.GetDeploymentEnvironments(serviceName)
+	if envErr != nil {
+		fmt.Printf("Warning: Could not fetch deployment environments: %v\n", envErr)
+	} else {
+		// Find Test environment
+		var testEnv *bitbucket.Environment
+		for _, env := range environments {
+			if strings.EqualFold(env.Name, "Test") {
+				testEnv = env
+				break
+			}
+		}
+
+		if testEnv != nil {
+			deploymentVariables, _ = client.GetDeploymentVariablesForEnv(serviceName, testEnv.UUID)
+		}
+	}
+
+	// Check if we have any variables
+	totalVars := len(repoVariables) + len(deploymentVariables)
+	if totalVars == 0 {
+		fmt.Println("No variables found.")
+		return
+	}
+
+	// Create table with Source column
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("Name", "Value", "Secured", "Source")
+
+	// Add repository variables
+	for _, v := range repoVariables {
+		value := v.Value
+		if v.Secured {
+			value = "********"
+		}
+		securedStr := "No"
+		if v.Secured {
+			securedStr = "Yes"
+		}
+		table.Append(v.Key, value, securedStr, "Repository")
+	}
+
+	// Add deployment variables
+	for _, v := range deploymentVariables {
+		value := v.Value
+		if v.Secured {
+			value = "********"
+		}
+		securedStr := "No"
+		if v.Secured {
+			securedStr = "Yes"
+		}
+		table.Append(v.Key, value, securedStr, "Test")
+	}
+
+	table.Render()
+	fmt.Printf("\nTotal: %d variable(s) (%d repository, %d deployment)\n",
+		totalVars, len(repoVariables), len(deploymentVariables))
 }
 
 func displayRepositoryVariables(client *bitbucket.Client, serviceName string) {
@@ -262,7 +380,7 @@ func displayAllEnvironmentVariables(client *bitbucket.Client, serviceName string
 
 func init() {
 	rootCmd.AddCommand(varsCmd)
-	varsCmd.Flags().StringVarP(&variableType, "type", "t", "deployment", "Type of variables to display (deployment, repository)")
+	varsCmd.Flags().StringVarP(&variableType, "type", "t", "combined", "Type of variables to display (combined, deployment, repository, workspace)")
 	varsCmd.Flags().StringVarP(&environmentName, "env", "e", "Test", "Environment name to filter (deployment variables only)")
 	varsCmd.Flags().BoolVarP(&showAllEnvs, "all", "a", false, "Show variables for all environments (deployment variables only)")
 	varsCmd.Flags().BoolVar(&autoCreateEnv, "auto-create-env", false, "Automatically create missing environments without prompting")
