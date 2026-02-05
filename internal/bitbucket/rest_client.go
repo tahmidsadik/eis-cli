@@ -446,7 +446,7 @@ func (c *RestClient) GetStepLog(repoSlug, pipelineUUID, stepUUID string, lines i
 	return strings.Join(lastLines, "\n"), nil
 }
 
-// ListRepositoryVariables fetches repository-level pipeline variables
+// ListRepositoryVariables fetches repository-level pipeline variables with pagination
 func (c *RestClient) ListRepositoryVariables(repoSlug string) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repositories/%s/%s/pipelines_config/variables/?pagelen=100",
 		c.workspace, repoSlug)
@@ -538,7 +538,7 @@ func (c *RestClient) ListDeploymentEnvironments(repoSlug string) ([]map[string]i
 	return environments, nil
 }
 
-// ListDeploymentVariables fetches deployment variables for a specific environment
+// ListDeploymentVariables fetches deployment variables for a specific environment with pagination
 func (c *RestClient) ListDeploymentVariables(repoSlug, environmentUUID string) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repositories/%s/%s/deployments_config/environments/%s/variables?pagelen=100",
 		c.workspace, repoSlug, environmentUUID)
