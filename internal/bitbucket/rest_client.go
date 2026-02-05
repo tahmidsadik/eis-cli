@@ -221,35 +221,48 @@ func (c *RestClient) ListPipelinesWithSteps(repoSlug string, limit int, logLines
 
 // ListRepositories fetches all repositories in the workspace
 func (c *RestClient) ListRepositories() ([]*Repository, error) {
-	path := fmt.Sprintf("/repositories/%s", c.workspace)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
+	path := fmt.Sprintf("/repositories/%s?pagelen=100", c.workspace)
 
 	repositories := make([]*Repository, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if repoData, ok := v.(map[string]interface{}); ok {
-				repo := &Repository{}
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
 
-				if slug, ok := repoData["slug"].(string); ok {
-					repo.Slug = slug
-				}
-				if name, ok := repoData["name"].(string); ok {
-					repo.Name = name
-				}
-				if desc, ok := repoData["description"].(string); ok {
-					repo.Description = desc
-				}
-				if fullName, ok := repoData["full_name"].(string); ok {
-					repo.FullName = fullName
-				}
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if repoData, ok := v.(map[string]interface{}); ok {
+					repo := &Repository{}
 
-				repositories = append(repositories, repo)
+					if slug, ok := repoData["slug"].(string); ok {
+						repo.Slug = slug
+					}
+					if name, ok := repoData["name"].(string); ok {
+						repo.Name = name
+					}
+					if desc, ok := repoData["description"].(string); ok {
+						repo.Description = desc
+					}
+					if fullName, ok := repoData["full_name"].(string); ok {
+						repo.FullName = fullName
+					}
+
+					repositories = append(repositories, repo)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -258,20 +271,33 @@ func (c *RestClient) ListRepositories() ([]*Repository, error) {
 
 // ListProjects fetches all projects in the workspace
 func (c *RestClient) ListProjects() ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/workspaces/%s/projects", c.workspace)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
+	path := fmt.Sprintf("/workspaces/%s/projects?pagelen=100", c.workspace)
 
 	projects := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if projectData, ok := v.(map[string]interface{}); ok {
-				projects = append(projects, projectData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if projectData, ok := v.(map[string]interface{}); ok {
+					projects = append(projects, projectData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -280,43 +306,56 @@ func (c *RestClient) ListProjects() ([]map[string]interface{}, error) {
 
 // GetPipelineSteps fetches steps for a specific pipeline
 func (c *RestClient) GetPipelineSteps(repoSlug, pipelineUUID string) ([]*PipelineStep, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/",
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/?pagelen=100",
 		c.workspace, repoSlug, pipelineUUID)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
 
 	steps := make([]*PipelineStep, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if stepData, ok := v.(map[string]interface{}); ok {
-				step := &PipelineStep{}
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
 
-				if uuid, ok := stepData["uuid"].(string); ok {
-					step.UUID = uuid
-				}
-				if name, ok := stepData["name"].(string); ok {
-					step.Name = name
-				}
-				if stateData, ok := stepData["state"].(map[string]interface{}); ok {
-					if stateName, ok := stateData["name"].(string); ok {
-						step.State = stateName
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if stepData, ok := v.(map[string]interface{}); ok {
+					step := &PipelineStep{}
+
+					if uuid, ok := stepData["uuid"].(string); ok {
+						step.UUID = uuid
 					}
-					if resultData, ok := stateData["result"].(map[string]interface{}); ok {
-						if resultName, ok := resultData["name"].(string); ok {
-							step.Result = resultName
+					if name, ok := stepData["name"].(string); ok {
+						step.Name = name
+					}
+					if stateData, ok := stepData["state"].(map[string]interface{}); ok {
+						if stateName, ok := stateData["name"].(string); ok {
+							step.State = stateName
+						}
+						if resultData, ok := stateData["result"].(map[string]interface{}); ok {
+							if resultName, ok := resultData["name"].(string); ok {
+								step.Result = resultName
+							}
 						}
 					}
-				}
-				if durationMs, ok := stepData["duration_in_seconds"].(float64); ok {
-					step.DurationSec = int(durationMs)
-				}
+					if durationMs, ok := stepData["duration_in_seconds"].(float64); ok {
+						step.DurationSec = int(durationMs)
+					}
 
-				steps = append(steps, step)
+					steps = append(steps, step)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -409,21 +448,35 @@ func (c *RestClient) GetStepLog(repoSlug, pipelineUUID, stepUUID string, lines i
 
 // ListRepositoryVariables fetches repository-level pipeline variables
 func (c *RestClient) ListRepositoryVariables(repoSlug string) ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/pipelines_config/variables/",
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines_config/variables/?pagelen=100",
 		c.workspace, repoSlug)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
 
 	variables := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if varData, ok := v.(map[string]interface{}); ok {
-				variables = append(variables, varData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if varData, ok := v.(map[string]interface{}); ok {
+					variables = append(variables, varData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			// Extract path from full URL
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -451,21 +504,34 @@ func (c *RestClient) CreateRepositoryVariable(repoSlug, key, value string, secur
 
 // ListDeploymentEnvironments fetches all deployment environments for a repository
 func (c *RestClient) ListDeploymentEnvironments(repoSlug string) ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/environments/",
+	path := fmt.Sprintf("/repositories/%s/%s/environments/?pagelen=100",
 		c.workspace, repoSlug)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
 
 	environments := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if envData, ok := v.(map[string]interface{}); ok {
-				environments = append(environments, envData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if envData, ok := v.(map[string]interface{}); ok {
+					environments = append(environments, envData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -474,21 +540,35 @@ func (c *RestClient) ListDeploymentEnvironments(repoSlug string) ([]map[string]i
 
 // ListDeploymentVariables fetches deployment variables for a specific environment
 func (c *RestClient) ListDeploymentVariables(repoSlug, environmentUUID string) ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/deployments_config/environments/%s/variables",
+	path := fmt.Sprintf("/repositories/%s/%s/deployments_config/environments/%s/variables?pagelen=100",
 		c.workspace, repoSlug, environmentUUID)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
 
 	variables := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if varData, ok := v.(map[string]interface{}); ok {
-				variables = append(variables, varData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if varData, ok := v.(map[string]interface{}); ok {
+					variables = append(variables, varData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			// Extract path from full URL
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -537,20 +617,33 @@ func (c *RestClient) CreateDeploymentEnvironment(repoSlug, envName, envType stri
 
 // ListWorkspaceVariables fetches workspace-level pipeline variables
 func (c *RestClient) ListWorkspaceVariables() ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/workspaces/%s/pipelines-config/variables", c.workspace)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, err
-	}
+	path := fmt.Sprintf("/workspaces/%s/pipelines-config/variables?pagelen=100", c.workspace)
 
 	variables := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if varData, ok := v.(map[string]interface{}); ok {
-				variables = append(variables, varData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, err
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if varData, ok := v.(map[string]interface{}); ok {
+					variables = append(variables, varData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
@@ -935,21 +1028,34 @@ func (c *RestClient) CreatePipelineSSHKeyPair(repoSlug, privateKey, publicKey st
 
 // ListDeployKeys retrieves all deploy keys for a repository
 func (c *RestClient) ListDeployKeys(repoSlug string) ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/deploy-keys",
+	path := fmt.Sprintf("/repositories/%s/%s/deploy-keys?pagelen=100",
 		c.workspace, repoSlug)
-
-	data, err := c.doRequest("GET", path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list deploy keys: %w", err)
-	}
 
 	deployKeys := make([]map[string]interface{}, 0)
 
-	if values, ok := data["values"].([]interface{}); ok {
-		for _, v := range values {
-			if keyData, ok := v.(map[string]interface{}); ok {
-				deployKeys = append(deployKeys, keyData)
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list deploy keys: %w", err)
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if keyData, ok := v.(map[string]interface{}); ok {
+					deployKeys = append(deployKeys, keyData)
+				}
 			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
 		}
 	}
 
