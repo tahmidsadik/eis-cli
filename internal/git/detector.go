@@ -4,26 +4,36 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 )
 
-// DetectRepositorySlug attempts to detect the repository slug from the current directory's git remote
-func DetectRepositorySlug() (string, error) {
-	// Get current working directory
+// openRepository opens the git repository for the current working directory.
+// EnableDotGitCommonDir is set so that git worktrees are handled correctly —
+// without it, go-git cannot resolve remotes/config from the shared .git directory.
+func openRepository() (*git.Repository, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	// Open git repository
 	repo, err := git.PlainOpenWithOptions(cwd, &git.PlainOpenOptions{
-		DetectDotGit: true,
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
 	})
 	if err != nil {
-		return "", fmt.Errorf("not a git repository or git repository not found: %w", err)
+		return nil, fmt.Errorf("not a git repository or git repository not found: %w", err)
+	}
+
+	return repo, nil
+}
+
+// DetectRepositorySlug attempts to detect the repository slug from the current directory's git remote
+func DetectRepositorySlug() (string, error) {
+	repo, err := openRepository()
+	if err != nil {
+		return "", err
 	}
 
 	// Get remote config
@@ -112,44 +122,15 @@ func extractSlugFromPath(path string) (string, error) {
 
 // IsGitRepository checks if the current directory is within a git repository
 func IsGitRepository() bool {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return false
-	}
-
-	// Try to find .git directory by traversing up
-	dir := cwd
-	for {
-		gitDir := filepath.Join(dir, ".git")
-		if _, err := os.Stat(gitDir); err == nil {
-			return true
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root
-			break
-		}
-		dir = parent
-	}
-
-	return false
+	_, err := openRepository()
+	return err == nil
 }
 
 // GetCurrentBranch detects the current git branch name
 func GetCurrentBranch() (string, error) {
-	// Get current working directory
-	cwd, err := os.Getwd()
+	repo, err := openRepository()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	// Open git repository
-	repo, err := git.PlainOpenWithOptions(cwd, &git.PlainOpenOptions{
-		DetectDotGit: true,
-	})
-	if err != nil {
-		return "", fmt.Errorf("not a git repository or git repository not found: %w", err)
+		return "", err
 	}
 
 	// Get the HEAD reference
@@ -169,18 +150,9 @@ func GetCurrentBranch() (string, error) {
 
 // GetUserEmail retrieves the git user's email from git config
 func GetUserEmail() (string, error) {
-	// Get current working directory
-	cwd, err := os.Getwd()
+	repo, err := openRepository()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	// Open git repository
-	repo, err := git.PlainOpenWithOptions(cwd, &git.PlainOpenOptions{
-		DetectDotGit: true,
-	})
-	if err != nil {
-		return "", fmt.Errorf("not a git repository or git repository not found: %w", err)
+		return "", err
 	}
 
 	// Get git config
