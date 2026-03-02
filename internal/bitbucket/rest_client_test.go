@@ -546,6 +546,281 @@ func TestGetPipelineStepsPagination(t *testing.T) {
 	}
 }
 
+// TestGetDefaultReviewersPagination tests that GetDefaultReviewers handles pagination correctly
+func TestGetDefaultReviewersPagination(t *testing.T) {
+	tests := []struct {
+		name          string
+		pages         [][]map[string]interface{}
+		expectedCount int
+		expectedUUIDs []string
+	}{
+		{
+			name: "Single page - two reviewers",
+			pages: [][]map[string]interface{}{
+				{
+					{"uuid": "{user-1}", "display_name": "Alice", "username": "alice"},
+					{"uuid": "{user-2}", "display_name": "Bob", "username": "bob"},
+				},
+			},
+			expectedCount: 2,
+			expectedUUIDs: []string{"{user-1}", "{user-2}"},
+		},
+		{
+			name: "Multiple pages",
+			pages: [][]map[string]interface{}{
+				{{"uuid": "{user-1}", "display_name": "Alice"}},
+				{{"uuid": "{user-2}", "display_name": "Bob"}},
+				{{"uuid": "{user-3}", "display_name": "Charlie"}},
+			},
+			expectedCount: 3,
+			expectedUUIDs: []string{"{user-1}", "{user-2}", "{user-3}"},
+		},
+		{
+			name:          "Empty - no default reviewers",
+			pages:         [][]map[string]interface{}{{}},
+			expectedCount: 0,
+			expectedUUIDs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pageIndex := 0
+
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var nextURL string
+				if pageIndex < len(tt.pages)-1 {
+					nextURL = server.URL + "/2.0/repositories/workspace/repo/default-reviewers?pagelen=100&page=2"
+				}
+
+				response := mockPaginatedResponse(tt.pages[pageIndex], nextURL)
+				pageIndex++
+
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+			}))
+			defer server.Close()
+
+			client := &RestClient{
+				workspace: "workspace",
+				client:    server.Client(),
+				baseURL:   server.URL + "/2.0",
+			}
+
+			reviewers, err := client.GetDefaultReviewers("repo")
+			if err != nil {
+				t.Fatalf("GetDefaultReviewers returned error: %v", err)
+			}
+
+			if len(reviewers) != tt.expectedCount {
+				t.Errorf("Expected %d reviewers, got %d", tt.expectedCount, len(reviewers))
+			}
+
+			for _, expectedUUID := range tt.expectedUUIDs {
+				found := false
+				for _, r := range reviewers {
+					if r["uuid"] == expectedUUID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected UUID %s not found in results", expectedUUID)
+				}
+			}
+		})
+	}
+}
+
+// TestCreatePullRequestWithDefaultReviewers tests that CreatePullRequest includes default reviewers
+func TestCreatePullRequestWithDefaultReviewers(t *testing.T) {
+	tests := []struct {
+		name              string
+		defaultReviewers  []map[string]interface{}
+		currentUserUUID   string
+		expectedReviewers []string // UUIDs expected in the POST body
+	}{
+		{
+			name: "Includes default reviewers, excludes current user",
+			defaultReviewers: []map[string]interface{}{
+				{"uuid": "{user-1}", "display_name": "Alice"},
+				{"uuid": "{user-2}", "display_name": "Bob"},
+				{"uuid": "{user-3}", "display_name": "Charlie"},
+			},
+			currentUserUUID:   "{user-2}",
+			expectedReviewers: []string{"{user-1}", "{user-3}"},
+		},
+		{
+			name:              "No default reviewers configured",
+			defaultReviewers:  []map[string]interface{}{},
+			currentUserUUID:   "{user-1}",
+			expectedReviewers: nil,
+		},
+		{
+			name: "All reviewers are current user - no reviewers in body",
+			defaultReviewers: []map[string]interface{}{
+				{"uuid": "{user-1}", "display_name": "Alice"},
+			},
+			currentUserUUID:   "{user-1}",
+			expectedReviewers: nil,
+		},
+		{
+			name: "Single reviewer who is not current user",
+			defaultReviewers: []map[string]interface{}{
+				{"uuid": "{user-2}", "display_name": "Bob"},
+			},
+			currentUserUUID:   "{user-1}",
+			expectedReviewers: []string{"{user-2}"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedBody map[string]interface{}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+
+				switch {
+				case strings.Contains(r.URL.Path, "/default-reviewers"):
+					// Return default reviewers
+					resp := mockPaginatedResponse(tt.defaultReviewers, "")
+					json.NewEncoder(w).Encode(resp)
+
+				case r.URL.Path == "/2.0/user" && r.Method == "GET":
+					// Return current user
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"uuid":     tt.currentUserUUID,
+						"username": "currentuser",
+					})
+
+				case strings.Contains(r.URL.Path, "/pullrequests") && r.Method == "POST":
+					// Capture the request body and return a PR response
+					json.NewDecoder(r.Body).Decode(&capturedBody)
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"id":    float64(1),
+						"title": "Test PR",
+						"state": "OPEN",
+						"source": map[string]interface{}{
+							"branch": map[string]interface{}{"name": "feature"},
+						},
+						"destination": map[string]interface{}{
+							"branch": map[string]interface{}{"name": "master"},
+						},
+						"links": map[string]interface{}{
+							"html": map[string]interface{}{
+								"href": "https://bitbucket.org/workspace/repo/pull-requests/1",
+							},
+						},
+					})
+
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+
+			client := &RestClient{
+				workspace: "workspace",
+				client:    server.Client(),
+				baseURL:   server.URL + "/2.0",
+			}
+
+			pr, err := client.CreatePullRequest("repo", "feature", "master", "Test PR", "description")
+			if err != nil {
+				t.Fatalf("CreatePullRequest returned error: %v", err)
+			}
+
+			if pr.ID != 1 {
+				t.Errorf("Expected PR ID 1, got %d", pr.ID)
+			}
+
+			// Verify reviewers in the request body
+			if tt.expectedReviewers == nil {
+				if _, ok := capturedBody["reviewers"]; ok {
+					t.Error("Expected no reviewers field in request body, but found one")
+				}
+			} else {
+				reviewersRaw, ok := capturedBody["reviewers"].([]interface{})
+				if !ok {
+					t.Fatal("Expected reviewers array in request body")
+				}
+
+				if len(reviewersRaw) != len(tt.expectedReviewers) {
+					t.Errorf("Expected %d reviewers, got %d", len(tt.expectedReviewers), len(reviewersRaw))
+				}
+
+				for _, expectedUUID := range tt.expectedReviewers {
+					found := false
+					for _, rv := range reviewersRaw {
+						if reviewer, ok := rv.(map[string]interface{}); ok {
+							if reviewer["uuid"] == expectedUUID {
+								found = true
+								break
+							}
+						}
+					}
+					if !found {
+						t.Errorf("Expected reviewer UUID %s not found in request body", expectedUUID)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestCreatePullRequestDefaultReviewersFetchFails tests graceful degradation when fetching reviewers fails
+func TestCreatePullRequestDefaultReviewersFetchFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "/default-reviewers"):
+			// Return an error for default reviewers
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": map[string]interface{}{
+					"message": "forbidden",
+				},
+			})
+
+		case strings.Contains(r.URL.Path, "/pullrequests") && r.Method == "POST":
+			// PR creation should still succeed
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":    float64(42),
+				"title": "Test PR",
+				"state": "OPEN",
+				"source": map[string]interface{}{
+					"branch": map[string]interface{}{"name": "feature"},
+				},
+				"destination": map[string]interface{}{
+					"branch": map[string]interface{}{"name": "master"},
+				},
+			})
+
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := &RestClient{
+		workspace: "workspace",
+		client:    server.Client(),
+		baseURL:   server.URL + "/2.0",
+	}
+
+	pr, err := client.CreatePullRequest("repo", "feature", "master", "Test PR", "description")
+	if err != nil {
+		t.Fatalf("CreatePullRequest should succeed even if default reviewers fetch fails, got: %v", err)
+	}
+
+	if pr.ID != 42 {
+		t.Errorf("Expected PR ID 42, got %d", pr.ID)
+	}
+}
+
 // TestListProjectsPagination tests that ListProjects handles pagination correctly
 func TestListProjectsPagination(t *testing.T) {
 	tests := []struct {

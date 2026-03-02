@@ -698,6 +698,41 @@ func (c *RestClient) UpdateWorkspaceVariable(uuid, key, value string, secured bo
 	return data, nil
 }
 
+// GetDefaultReviewers fetches the default reviewers configured for a repository
+func (c *RestClient) GetDefaultReviewers(repoSlug string) ([]map[string]interface{}, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/default-reviewers?pagelen=100", c.workspace, repoSlug)
+
+	reviewers := make([]map[string]interface{}, 0)
+
+	for path != "" {
+		data, err := c.doRequest("GET", path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default reviewers: %w", err)
+		}
+
+		if values, ok := data["values"].([]interface{}); ok {
+			for _, v := range values {
+				if userData, ok := v.(map[string]interface{}); ok {
+					reviewers = append(reviewers, userData)
+				}
+			}
+		}
+
+		// Check for next page
+		if next, ok := data["next"].(string); ok && next != "" {
+			if strings.Contains(next, "/2.0") {
+				path = strings.SplitN(next, "/2.0", 2)[1]
+			} else {
+				path = ""
+			}
+		} else {
+			path = ""
+		}
+	}
+
+	return reviewers, nil
+}
+
 // CreatePullRequest creates a new pull request
 func (c *RestClient) CreatePullRequest(repoSlug, sourceBranch, destBranch, title, description string) (*PullRequest, error) {
 	path := fmt.Sprintf("/repositories/%s/%s/pullrequests", c.workspace, repoSlug)
@@ -715,6 +750,31 @@ func (c *RestClient) CreatePullRequest(repoSlug, sourceBranch, destBranch, title
 				"name": destBranch,
 			},
 		},
+	}
+
+	// Fetch default reviewers and include them, excluding the current user
+	defaultReviewers, err := c.GetDefaultReviewers(repoSlug)
+	if err == nil && len(defaultReviewers) > 0 {
+		// Get current user to exclude from reviewers (author can't be a reviewer)
+		var currentUserUUID string
+		if currentUser, err := c.GetCurrentUser(); err == nil {
+			currentUserUUID = currentUser.UUID
+		}
+
+		reviewers := make([]map[string]interface{}, 0, len(defaultReviewers))
+		for _, reviewer := range defaultReviewers {
+			if uuid, ok := reviewer["uuid"].(string); ok && uuid != "" {
+				if uuid == currentUserUUID {
+					continue
+				}
+				reviewers = append(reviewers, map[string]interface{}{
+					"uuid": uuid,
+				})
+			}
+		}
+		if len(reviewers) > 0 {
+			requestBody["reviewers"] = reviewers
+		}
 	}
 
 	data, err := c.doRequestWithBody("POST", path, requestBody)
